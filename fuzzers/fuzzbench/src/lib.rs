@@ -37,7 +37,7 @@ use libafl::{
         token_mutations::I2SRandReplace,
         tokens_mutations, Tokens,
     },
-    observers::{StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
@@ -206,7 +206,7 @@ fn fuzz(
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");

@@ -34,13 +34,13 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, Tokens,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
-        TracingStage,
+        StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -205,7 +205,7 @@ fn fuzz(
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -255,14 +255,11 @@ fn fuzz(
 
     let calibration = CalibrationStage::new(&mut state, &edges_observer);
 
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(
-        &mut state,
-        havoc_mutations()
-            .merge(tokens_mutations())
-            .merge(tuple_list!(I2SRandReplace::new())),
-        5,
-    )?;
+    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
 
     let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
 
@@ -308,7 +305,7 @@ fn fuzz(
     ));
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
