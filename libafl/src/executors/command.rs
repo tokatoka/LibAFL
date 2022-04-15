@@ -23,6 +23,7 @@ use crate::{
     },
     inputs::HasTargetBytes,
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
+    Evaluator,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -184,6 +185,7 @@ impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
+    Z: Evaluator<Self, EM, I, S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
@@ -197,6 +199,7 @@ impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
+    Z: Evaluator<Self, EM, I, S>,
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
@@ -207,6 +210,7 @@ where
 impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
 where
     OT: MatchName + Debug,
+    Z: Evaluator<Self, EM, I, S>,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -309,6 +313,7 @@ where
     T: CommandConfigurator,
     OT: Debug + MatchName,
     T: Debug,
+    Z: Evaluator<Self, EM, I, S>,
 {
     fn run_target(
         &mut self,
@@ -380,6 +385,8 @@ where
 
 impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
     for CommandExecutor<EM, I, OT, S, T, Z>
+where
+    Z: Evaluator<Self, EM, I, S>,
 {
     fn observers(&self) -> &OT {
         &self.observers
@@ -536,6 +543,7 @@ impl CommandExecutorBuilder {
     ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
     where
         OT: Debug + MatchName,
+        Z: Evaluator<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, EM, I, S>,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -630,9 +638,13 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
+    fn into_Executor<E, EM, I, OT, S, Z>(
+        self,
+        observers: OT,
+    ) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
+        Z: Evaluator<Self, EM, I, S>,
     {
         let has_asan_observer = observers
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
@@ -667,11 +679,16 @@ mod tests {
         },
         inputs::BytesInput,
         monitors::SimpleMonitor,
+        Error, Evaluator, ExecuteInputResult,
     };
 
     #[test]
     #[cfg(unix)]
     fn test_builder() {
+        use std::marker::PhantomData;
+
+        use crate::NopEvaluator;
+
         let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
@@ -683,9 +700,13 @@ mod tests {
         let executor = executor.build(());
         let mut executor = executor.unwrap();
 
+        let mut fuzzer = NopEvaluator {
+            phantom: PhantomData,
+        };
+
         executor
             .run_target(
-                &mut (),
+                &mut fuzzer,
                 &mut (),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),

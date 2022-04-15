@@ -614,6 +614,46 @@ where
     }
 }
 
+/// A `Evaluator` that does nothing and returns dummy values.
+/// For testing purposes only.
+#[cfg(test)]
+#[derive(Debug)]
+pub struct NopEvaluator<E, EM, I, S>
+where
+    E: Executor<EM, I, S, Self>,
+    I: Input,
+{
+    phantom: PhantomData<(E, EM, I, S)>,
+}
+
+#[cfg(test)]
+impl<E, EM, I, S> Evaluator<E, EM, I, S> for NopEvaluator<E, EM, I, S>
+where
+    E: Executor<EM, I, S, Self>,
+    I: Input,
+{
+    fn evaluate_input_events(
+        &mut self,
+        _state: &mut S,
+        _executor: &mut E,
+        _manager: &mut EM,
+        _input: I,
+        _send_events: bool,
+    ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
+        Ok((ExecuteInputResult::None, None))
+    }
+
+    fn add_input(
+        &mut self,
+        _state: &mut S,
+        _executor: &mut E,
+        _manager: &mut EM,
+        _input: I,
+    ) -> Result<usize, Error> {
+        Ok(0)
+    }
+}
+
 impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: Scheduler<I, S>,
