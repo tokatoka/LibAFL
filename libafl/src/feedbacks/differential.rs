@@ -150,7 +150,7 @@ where
             .match_name(&self.o2_name)
             .ok_or_else(|| err(&self.o2_name))?;
 
-        Ok(o1 != o2)
+        Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
     }
 
     #[inline]

@@ -23,7 +23,6 @@ use crate::{
     },
     inputs::HasTargetBytes,
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
-    Evaluator,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
