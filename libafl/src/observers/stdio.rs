@@ -4,9 +4,11 @@
 
 use crate::{bolts::tuples::Named, observers::Observer};
 
+use serde::{Deserialize, Serialize};
+
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StdOutObserver {
     /// The name of the observer.
     pub name: String,
@@ -33,7 +35,7 @@ impl Named for StdOutObserver {
 
 /// An observer that captures stderr of a target.
 /// Only works for supported executors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StdErrObserver {
     /// The name of the observer.
     pub name: String,

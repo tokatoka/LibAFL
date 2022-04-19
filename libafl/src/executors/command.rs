@@ -185,7 +185,6 @@ impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
-    Z: Evaluator<Self, EM, I, S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
@@ -199,7 +198,6 @@ impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
-    Z: Evaluator<Self, EM, I, S>,
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
@@ -210,7 +208,6 @@ where
 impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
 where
     OT: MatchName + Debug,
-    Z: Evaluator<Self, EM, I, S>,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -313,7 +310,6 @@ where
     T: CommandConfigurator,
     OT: Debug + MatchName,
     T: Debug,
-    Z: Evaluator<Self, EM, I, S>,
 {
     fn run_target(
         &mut self,
@@ -385,8 +381,6 @@ where
 
 impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
     for CommandExecutor<EM, I, OT, S, T, Z>
-where
-    Z: Evaluator<Self, EM, I, S>,
 {
     fn observers(&self) -> &OT {
         &self.observers
@@ -543,7 +537,6 @@ impl CommandExecutorBuilder {
     ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
     where
         OT: Debug + MatchName,
-        Z: Evaluator<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, EM, I, S>,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -596,7 +589,7 @@ impl CommandExecutorBuilder {
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor(observers))
+        Ok(configurator.into_executor::<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, EM,I,OT,S,Z> (observers))
     }
 }
 
@@ -638,13 +631,12 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_Executor<E, EM, I, OT, S, Z>(
+    fn into_executor<E, EM, I, OT, S, Z>(
         self,
         observers: OT,
     ) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
-        Z: Evaluator<Self, EM, I, S>,
     {
         let has_asan_observer = observers
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
