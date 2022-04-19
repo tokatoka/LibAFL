@@ -78,6 +78,9 @@ pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
+    has_stdout_observer: bool,
+    has_stderr_observer: bool,
+    has_asan_observer: bool,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
     /// The Command to execute
@@ -97,6 +100,13 @@ impl CommandConfigurator for StdCommandConfigurator {
                 if !self.debug_child {
                     cmd.stdout(Stdio::null());
                     cmd.stderr(Stdio::null());
+                }
+
+                if self.has_stdout_observer {
+                    cmd.stdout(Stdio::piped());
+                }
+                if self.has_stderr_observer || self.has_asan_observer {
+                    cmd.stderr(Stdio::piped());
                 }
 
                 for (i, arg) in args.enumerate() {
@@ -151,13 +161,13 @@ where
     configurer: T,
     observers: OT,
     /// cache if the AsanBacktraceObserver is present
-    has_asan_observer: bool,
+    has_asan_observer: Option<String>,
     /// If set, we found a [`StdErrObserver`] in the observer list.
     /// Pipe the child's `stderr` instead of closing it.
-    has_stdout_observer: bool,
+    has_stdout_observer: Option<String>,
     /// If set, we found a [`StdOutObserver`] in the observer list
     /// Pipe the child's `stdout` instead of closing it.
-    has_stderr_observer: bool,
+    has_stderr_observer: Option<String>,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
@@ -215,6 +225,9 @@ where
         debug_child: bool,
         observers: OT,
         path: P,
+        has_stdout_observer: Option<String>,
+        has_stderr_observer: Option<String>,
+        has_asan_observer: Option<String>,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -226,35 +239,29 @@ where
         }
         command.stdin(Stdio::null());
 
-        let has_stdout_observer = observers
-            .match_name::<StdOutObserver>("StdOutObserver")
-            .is_some();
-        if has_stdout_observer {
-            command.stderr(Stdio::piped());
+        if has_stdout_observer.is_some() {
+            command.stdout(Stdio::piped());
         }
-
-        let has_stderr_observer = observers
-            .match_name::<StdErrObserver>("StdErrObserver")
-            .is_some();
-        let has_asan_observer = observers
-            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            .is_some();
-        if has_stderr_observer || has_asan_observer {
+        if has_stderr_observer.is_some() || has_asan_observer.is_some() {
             command.stderr(Stdio::piped());
         }
 
         Ok(Self {
             observers,
-            has_asan_observer,
+
             configurer: StdCommandConfigurator {
                 input_location: InputLocation::File {
                     out_file: OutFile::create(path)?,
                 },
                 command,
                 debug_child,
+                has_stdout_observer: has_stdout_observer.is_some(),
+                has_stderr_observer: has_stderr_observer.is_some(),
+                has_asan_observer: has_asan_observer.is_some(),
             },
             has_stdout_observer,
             has_stderr_observer,
+            has_asan_observer,
             phantom: PhantomData,
         })
     }
@@ -266,6 +273,9 @@ where
         args: IT,
         observers: OT,
         debug_child: bool,
+        has_stdout_observer: Option<String>,
+        has_stderr_observer: Option<String>,
+        has_asan_observer: Option<String>,
     ) -> Result<Self, Error>
     where
         IT: IntoIterator<Item = O>,
@@ -274,6 +284,16 @@ where
         let mut atat_at = None;
         let mut builder = CommandExecutorBuilder::new();
         builder.debug_child(debug_child);
+        if let Some(name) = has_stdout_observer {
+            builder.stdout_observer(name);
+        }
+        if let Some(name) = has_stderr_observer {
+            builder.stderr_observer(name);
+        }
+        if let Some(name) = has_asan_observer {
+            builder.asan_observer(name);
+        }
+
         let afl_delim = OsStr::new("@@");
 
         for (pos, arg) in args.into_iter().enumerate() {
@@ -341,27 +361,27 @@ where
             }
         };
 
-        if self.has_asan_observer || self.has_stderr_observer {
+        if self.has_asan_observer.is_some() || self.has_stderr_observer.is_some() {
             let mut stderr = String::new();
             child.stderr.as_mut().ok_or_else(|| {
                 Error::IllegalState(
                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor".into(),
                 )
             })?.read_to_string(&mut stderr)?;
-            if self.has_asan_observer {
+            if let Some(name) = self.has_asan_observer.as_ref() {
                 self.observers
-                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                    .match_name_mut::<ASANBacktraceObserver>(name)
                     .unwrap()
                     .parse_asan_output(&stderr);
             }
-            if self.has_stderr_observer {
+            if let Some(name) = self.has_stderr_observer.as_ref() {
                 self.observers
-                    .match_name_mut::<StdErrObserver>("StdErrObserver")
+                    .match_name_mut::<StdErrObserver>(name)
                     .unwrap()
                     .stderr = Some(stderr);
             }
         }
-        if self.has_stdout_observer {
+        if let Some(name) = self.has_stdout_observer.as_ref() {
             let mut stdout = String::new();
             child.stdout.as_mut().ok_or_else(|| {
                 Error::IllegalState(
@@ -369,7 +389,7 @@ where
                 )
             })?.read_to_string(&mut stdout)?;
             self.observers
-                .match_name_mut::<StdOutObserver>("StdOutObserver")
+                .match_name_mut::<StdOutObserver>(name)
                 .unwrap()
                 .stdout = Some(stdout);
         }
@@ -399,6 +419,9 @@ pub struct CommandExecutorBuilder {
     input_location: InputLocation,
     cwd: Option<PathBuf>,
     envs: Vec<(OsString, OsString)>,
+    has_stdout_observer: Option<String>,
+    has_stderr_observer: Option<String>,
+    has_asan_observer: Option<String>,
 }
 
 impl Default for CommandExecutorBuilder {
@@ -418,7 +441,28 @@ impl CommandExecutorBuilder {
             cwd: None,
             envs: vec![],
             debug_child: false,
+            has_stdout_observer: None,
+            has_stderr_observer: None,
+            has_asan_observer: None,
         }
+    }
+
+    /// Set the stdout observer name
+    pub fn stdout_observer(&mut self, name: String) -> &mut Self {
+        self.has_stdout_observer = Some(name);
+        self
+    }
+
+    /// Set the stderr observer name
+    pub fn stderr_observer(&mut self, name: String) -> &mut Self {
+        self.has_stderr_observer = Some(name);
+        self
+    }
+
+    /// Set the asan observer name
+    pub fn asan_observer(&mut self, name: String) -> &mut Self {
+        self.has_asan_observer = Some(name);
+        self
     }
 
     /// Set the binary to execute
@@ -566,29 +610,23 @@ impl CommandExecutorBuilder {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        if observers
-            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            .is_some()
-            || observers
-                .match_name::<StdErrObserver>("StdErrObserver")
-                .is_some()
-        {
+        if self.has_stderr_observer.is_some() || self.has_asan_observer.is_some() {
             // we need stderr for ASANBackt
             command.stderr(Stdio::piped());
         }
-        if observers
-            .match_name::<StdOutObserver>("StdOutObserver")
-            .is_some()
-        {
+        if self.has_stdout_observer.is_some() {
             command.stdout(Stdio::piped());
         }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
+            has_stdout_observer: self.has_stdout_observer.is_some(),
+            has_stderr_observer: self.has_stderr_observer.is_some(),
+            has_asan_observer: self.has_asan_observer.is_some(),
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor::<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, EM,I,OT,S,Z> (observers))
+        Ok(configurator.into_executor::<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, EM,I,OT,S,Z> (observers, self.has_stdout_observer.clone(), self.has_stderr_observer.clone(), self. has_asan_observer.clone()))
     }
 }
 
@@ -633,22 +671,13 @@ pub trait CommandConfigurator: Sized + Debug {
     fn into_executor<E, EM, I, OT, S, Z>(
         self,
         observers: OT,
+        has_stdout_observer: Option<String>,
+        has_stderr_observer: Option<String>,
+        has_asan_observer: Option<String>,
     ) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
     {
-        let has_asan_observer = observers
-            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            .is_some();
-
-        let has_stdout_observer = observers
-            .match_name::<StdOutObserver>("StdOutObserver")
-            .is_some();
-
-        let has_stderr_observer = observers
-            .match_name::<StdErrObserver>("StdErrObserver")
-            .is_some();
-
         CommandExecutor {
             observers,
             has_asan_observer,
