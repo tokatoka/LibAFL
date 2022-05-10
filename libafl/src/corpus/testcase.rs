@@ -6,7 +6,7 @@ use core::{convert::Into, default::Default, option::Option, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{serdeany::SerdeAnyMap, HasLen},
+    bolts::{serdeany::NamedSerdeAnyMap, HasLen},
     inputs::Input,
     state::HasMetadata,
     Error,
@@ -24,7 +24,7 @@ where
     /// Filename, if this testcase is backed by a file in the filesystem
     filename: Option<String>,
     /// Map of metadata associated with this testcase
-    metadata: SerdeAnyMap,
+    metadata: NamedSerdeAnyMap,
     /// Time needed to execute the input
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
@@ -43,13 +43,13 @@ where
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata(&self) -> &NamedSerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.metadata
     }
 }
@@ -227,7 +227,7 @@ where
         Testcase {
             input: None,
             filename: None,
-            metadata: SerdeAnyMap::new(),
+            metadata: NamedSerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
             fuzz_level: 0,
@@ -288,6 +288,9 @@ pub struct SchedulerTestcaseMetaData {
 }
 
 impl SchedulerTestcaseMetaData {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "scheduler_meta";
+
     /// Create new [`struct@SchedulerTestcaseMetaData`]
     #[must_use]
     pub fn new(depth: u64) -> Self {

@@ -27,6 +27,9 @@ pub struct SyncFromDiskMetadata {
 crate::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "sync_from_disk_meta";
+
     /// Create a new [`struct@SyncFromDiskMetadata`]
     #[must_use]
     pub fn new(last_time: SystemTime) -> Self {
@@ -67,7 +70,7 @@ where
     ) -> Result<(), Error> {
         let last = state
             .metadata()
-            .get::<SyncFromDiskMetadata>()
+            .get::<SyncFromDiskMetadata>(SyncFromDiskMetadata::NAME)
             .map(|m| m.last_time);
         let path = self.sync_dir.clone();
         if let Some(max_time) =
@@ -75,12 +78,11 @@ where
         {
             if last.is_none() {
                 state
-                    .metadata_mut()
-                    .insert(SyncFromDiskMetadata::new(max_time));
+                    .add_metadata(SyncFromDiskMetadata::new(max_time), SyncFromDiskMetadata::NAME);
             } else {
                 state
                     .metadata_mut()
-                    .get_mut::<SyncFromDiskMetadata>()
+                    .get_mut::<SyncFromDiskMetadata>(SyncFromDiskMetadata::NAME)
                     .unwrap()
                     .last_time = max_time;
             }

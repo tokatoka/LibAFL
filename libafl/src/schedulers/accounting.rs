@@ -52,6 +52,9 @@ impl HasRefCnt for AccountingIndexesMetadata {
 }
 
 impl AccountingIndexesMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "accounting_indexes_meta";
+
     /// Creates a new [`struct@AccountingIndexesMetadata`].
     #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
@@ -79,6 +82,9 @@ pub struct TopAccountingMetadata {
 crate::impl_serdeany!(TopAccountingMetadata);
 
 impl TopAccountingMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "top_accouting_meta";
+
     /// Creates a new [`struct@TopAccountingMetadata`]
     #[must_use]
     pub fn new(acc_len: usize) -> Self {
@@ -130,7 +136,7 @@ where
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state
             .metadata()
-            .get::<TopAccountingMetadata>()
+            .get::<TopAccountingMetadata>(TopAccountingMetadata::NAME)
             .map_or(false, |x| x.changed)
         {
             self.accounting_cull(state)?;
@@ -143,7 +149,7 @@ where
                 .corpus()
                 .get(idx)?
                 .borrow()
-                .has_metadata::<IsFavoredMetadata>();
+                .has_metadata::<IsFavoredMetadata>(IsFavoredMetadata::NAME);
             has
         } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
@@ -174,7 +180,7 @@ where
 
                 let mut equal_score = false;
                 {
-                    let top_acc = state.metadata().get::<TopAccountingMetadata>().unwrap();
+                    let top_acc = state.metadata().get::<TopAccountingMetadata>(TopAccountingMetadata::NAME).unwrap();
 
                     if let Some(old_idx) = top_acc.map.get(&idx) {
                         if top_acc.max_accounting[idx] > self.accounting_map[idx] {
@@ -187,7 +193,7 @@ where
 
                         let mut old = state.corpus().get(*old_idx)?.borrow_mut();
                         let must_remove = {
-                            let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
+                            let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>(AccountingIndexesMetadata::NAME).ok_or_else(|| {
                                 Error::key_not_found(format!(
                                     "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{}",
                                     old_idx
@@ -198,14 +204,14 @@ where
                         };
 
                         if must_remove {
-                            drop(old.metadata_mut().remove::<AccountingIndexesMetadata>());
+                            drop(old.metadata_mut().remove::<AccountingIndexesMetadata>(AccountingIndexesMetadata::NAME));
                         }
                     }
                 }
 
                 let top_acc = state
                     .metadata_mut()
-                    .get_mut::<TopAccountingMetadata>()
+                    .get_mut::<TopAccountingMetadata>(TopAccountingMetadata::NAME)
                     .unwrap();
 
                 // if its accounting is equal to others', it's not favored
@@ -225,11 +231,12 @@ where
 
         state.corpus().get(idx)?.borrow_mut().metadata_mut().insert(
             AccountingIndexesMetadata::with_tcref(indexes, new_favoreds.len() as isize),
+            AccountingIndexesMetadata::NAME
         );
 
         let top_acc = state
             .metadata_mut()
-            .get_mut::<TopAccountingMetadata>()
+            .get_mut::<TopAccountingMetadata>(TopAccountingMetadata::NAME)
             .unwrap();
         top_acc.changed = true;
 
@@ -243,7 +250,7 @@ where
     /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
     pub fn accounting_cull(&self, state: &mut S) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopAccountingMetadata>() {
+        let top_rated = match state.metadata().get::<TopAccountingMetadata>(TopAccountingMetadata::NAME) {
             None => return Ok(()),
             Some(val) => val,
         };
@@ -254,7 +261,7 @@ where
                 continue;
             }
 
-            entry.add_metadata(IsFavoredMetadata {});
+            entry.add_metadata(IsFavoredMetadata {}, IsFavoredMetadata::NAME);
         }
 
         Ok(())
@@ -263,14 +270,14 @@ where
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self {
-        match state.metadata().get::<TopAccountingMetadata>() {
+        match state.metadata().get::<TopAccountingMetadata>(TopAccountingMetadata::NAME) {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
-                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()), TopAccountingMetadata::NAME);
                 }
             }
             None => {
-                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()), TopAccountingMetadata::NAME);
             }
         }
         Self {
@@ -288,14 +295,14 @@ where
         skip_non_favored_prob: u64,
         accounting_map: &'a [u32],
     ) -> Self {
-        match state.metadata().get::<TopAccountingMetadata>() {
+        match state.metadata().get::<TopAccountingMetadata>(TopAccountingMetadata::NAME, ) {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
-                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()), TopAccountingMetadata::NAME);
                 }
             }
             None => {
-                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()), TopAccountingMetadata::NAME);
             }
         }
         Self {

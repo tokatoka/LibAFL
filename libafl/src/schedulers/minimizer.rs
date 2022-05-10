@@ -24,6 +24,11 @@ pub struct IsFavoredMetadata {}
 
 crate::impl_serdeany!(IsFavoredMetadata);
 
+impl IsFavoredMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "isfavored_meta";
+}
+
 /// A state metadata holding a map of favoreds testcases for each map entry
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopRatedsMetadata {
@@ -34,6 +39,9 @@ pub struct TopRatedsMetadata {
 crate::impl_serdeany!(TopRatedsMetadata);
 
 impl TopRatedsMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "top_rateds_meta";
+
     /// Creates a new [`struct@TopRatedsMetadata`]
     #[must_use]
     pub fn new() -> Self {
@@ -110,7 +118,7 @@ where
                 .corpus()
                 .get(idx)?
                 .borrow()
-                .has_metadata::<IsFavoredMetadata>();
+                .has_metadata::<IsFavoredMetadata>(IsFavoredMetadata::NAME);
             has
         } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
@@ -133,8 +141,8 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
-        if state.metadata().get::<TopRatedsMetadata>().is_none() {
-            state.add_metadata(TopRatedsMetadata::new());
+        if state.has_metadata::<TopRatedsMetadata>(TopRatedsMetadata::NAME) {
+            state.add_metadata(TopRatedsMetadata::new(), TopRatedsMetadata::NAME);
         }
 
         let mut new_favoreds = vec![];
@@ -150,7 +158,7 @@ where
             for elem in meta.as_slice() {
                 if let Some(old_idx) = state
                     .metadata()
-                    .get::<TopRatedsMetadata>()
+                    .get::<TopRatedsMetadata>(TopRatedsMetadata::NAME)
                     .unwrap()
                     .map
                     .get(elem)
@@ -197,7 +205,7 @@ where
         for elem in new_favoreds {
             state
                 .metadata_mut()
-                .get_mut::<TopRatedsMetadata>()
+                .get_mut::<TopRatedsMetadata>(TopRatedsMetadata::NAME)
                 .unwrap()
                 .map
                 .insert(elem, idx);
@@ -208,7 +216,7 @@ where
     /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
+        let top_rated = match state.metadata().get::<TopRatedsMetadata>(TopRatedsMetadata::NAME) {
             None => return Ok(()),
             Some(val) => val,
         };
@@ -228,7 +236,7 @@ where
                     acc.insert(*elem);
                 }
 
-                entry.add_metadata(IsFavoredMetadata {});
+                entry.add_metadata(IsFavoredMetadata {}, IsFavoredMetadata::NAME);
             }
         }
 

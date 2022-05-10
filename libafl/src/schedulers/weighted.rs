@@ -40,6 +40,9 @@ impl Default for WeightedScheduleMetadata {
 }
 
 impl WeightedScheduleMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "weighted_scheduler_meta";
+
     /// Constructor for `WeightedScheduleMetadata`
     #[must_use]
     pub fn new() -> Self {
@@ -195,7 +198,7 @@ where
 
         let wsmeta = state
             .metadata_mut()
-            .get_mut::<WeightedScheduleMetadata>()
+            .get_mut::<WeightedScheduleMetadata>(WeightedScheduleMetadata::NAME)
             .ok_or_else(|| {
                 Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
             })?;
@@ -215,12 +218,12 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
-        if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(None));
+        if !state.has_metadata::<SchedulerMetadata>(SchedulerMetadata::NAME) {
+            state.add_metadata(SchedulerMetadata::new(None), SchedulerMetadata::NAME);
         }
 
-        if !state.has_metadata::<WeightedScheduleMetadata>() {
-            state.add_metadata(WeightedScheduleMetadata::new());
+        if !state.has_metadata::<WeightedScheduleMetadata>(WeightedScheduleMetadata::NAME) {
+            state.add_metadata(WeightedScheduleMetadata::new(), WeightedScheduleMetadata::NAME);
         }
 
         let current_idx = *state.corpus().current();
@@ -231,7 +234,7 @@ where
                 .get(parent_idx)?
                 .borrow_mut()
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetaData>(SchedulerTestcaseMetaData::NAME)
                 .ok_or_else(|| {
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?
@@ -245,7 +248,7 @@ where
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(depth));
+            .add_metadata(SchedulerTestcaseMetaData::new(depth), SchedulerTestcaseMetaData::NAME);
 
         // Recreate the alias table
         self.create_alias_table(state)?;
@@ -264,7 +267,7 @@ where
 
             let wsmeta = state
                 .metadata_mut()
-                .get_mut::<WeightedScheduleMetadata>()
+                .get_mut::<WeightedScheduleMetadata>(WeightedScheduleMetadata::NAME)
                 .ok_or_else(|| {
                     Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
                 })?;
@@ -287,7 +290,7 @@ where
             if current_cycles > corpus_counts {
                 let psmeta = state
                     .metadata_mut()
-                    .get_mut::<SchedulerMetadata>()
+                    .get_mut::<SchedulerMetadata>(SchedulerMetadata::NAME)
                     .ok_or_else(|| {
                         Error::key_not_found("SchedulerMetadata not found".to_string())
                     })?;

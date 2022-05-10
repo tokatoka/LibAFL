@@ -11,7 +11,7 @@ use std::{
 use crate::{
     bolts::{
         rands::Rand,
-        serdeany::{SerdeAny, SerdeAnyMap},
+        serdeany::{SerdeAny, NamedSerdeAnyMap},
     },
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
@@ -87,26 +87,44 @@ pub trait HasClientPerfMonitor {
 /// Trait for elements offering metadata
 pub trait HasMetadata {
     /// A map, storing all metadata
-    fn metadata(&self) -> &SerdeAnyMap;
+    fn metadata(&self) -> &NamedSerdeAnyMap;
     /// A map, storing all metadata (mutable)
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap;
+    fn metadata_mut(&mut self) -> &mut NamedSerdeAnyMap;
 
     /// Add a metadata to the metadata map
     #[inline]
-    fn add_metadata<M>(&mut self, meta: M)
+    fn add_metadata<M>(&mut self, meta: M, name: &str)
     where
         M: SerdeAny,
     {
-        self.metadata_mut().insert(meta);
+        self.metadata_mut().insert(meta, name);
+    }
+
+    /// Get a metadata from the metadata map
+    #[inline]
+    fn get_metadata<M>(&self, name: &str) -> Option<&M>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_mut().get(name)
+    }
+
+    /// Get a metadata from the metadata map (mutable)
+    #[inline]
+    fn get_metadata_mut<M>(&mut self, name: &str) -> Option<&mut M>
+    where
+        M: SerdeAny,
+    {
+        self.metadata_mut().get_mut(name)
     }
 
     /// Check for a metadata
     #[inline]
-    fn has_metadata<M>(&self) -> bool
+    fn has_metadata<M>(&self, name: &str) -> bool
     where
         M: SerdeAny,
     {
-        self.metadata().get::<M>().is_some()
+        self.metadata().contains::<M>(name)
     }
 }
 
@@ -163,7 +181,7 @@ where
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
-    metadata: SerdeAnyMap,
+    metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
     /// The stability of the current fuzzing process
@@ -265,13 +283,13 @@ where
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn metadata(&self) -> &SerdeAnyMap {
+    fn metadata(&self) -> &NamedSerdeAnyMap {
         &self.metadata
     }
 
     /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+    fn metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.metadata
     }
 }
@@ -567,7 +585,7 @@ where
             executions: 0,
             stability: None,
             start_time: Duration::from_millis(0),
-            metadata: SerdeAnyMap::default(),
+            metadata: NamedSerdeAnyMap::default(),
             corpus,
             feedback_states,
             solutions,

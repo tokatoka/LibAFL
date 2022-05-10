@@ -8,7 +8,7 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     inputs::Input,
-    observers::{concolic::ConcolicObserver, ObserversTuple},
+    observers::{concolic::{ConcolicMetadata, ConcolicObserver}, ObserversTuple},
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
@@ -59,7 +59,7 @@ where
                 .unwrap()
                 .borrow_mut()
                 .metadata_mut()
-                .insert(metadata);
+                .insert(metadata, ConcolicMetadata::NAME);
         }
         Ok(())
     }

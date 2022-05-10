@@ -302,6 +302,15 @@ macro_rules! create_serde_registry_for_trait {
                 map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
             }
 
+            // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
+            // We unwrap postcard, it should not have a reason to fail.
+            impl Clone for NamedSerdeAnyMap {
+                fn clone(&self) -> Self {
+                    let serialized = postcard::to_allocvec(&self).unwrap();
+                    postcard::from_bytes(&serialized).unwrap()
+                }
+            }
+
             #[allow(unused_qualifications)]
             impl NamedSerdeAnyMap {
                 /// Get an element by name
@@ -496,15 +505,18 @@ macro_rules! create_serde_registry_for_trait {
                 /// Insert an element into this map.
                 #[inline]
                 #[allow(unused_qualifications)]
-                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &str) {
-                    let id = unpack_type_id((*val).type_id());
+                pub fn insert<T>(&mut self, val: T, name: &str)
+                where
+                    T: $trait_name
+                {
+                    let id = unpack_type_id(TypeId::of::<T>());
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
                     self.map
                         .get_mut(&id)
                         .unwrap()
-                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), val);
+                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), Box::new(val));
                 }
 
                 /// Returns the `len` of this map.

@@ -102,7 +102,7 @@ where
 
             let psmeta = state
                 .metadata_mut()
-                .get_mut::<SchedulerMetadata>()
+                .get_mut::<SchedulerMetadata>(SchedulerMetadata::NAME)
                 .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
             hash %= psmeta.n_fuzz().len();
@@ -115,7 +115,7 @@ where
                     .get(idx)?
                     .borrow_mut()
                     .metadata_mut()
-                    .get_mut::<SchedulerTestcaseMetaData>()
+                    .get_mut::<SchedulerTestcaseMetaData>(SchedulerTestcaseMetaData::NAME)
                     .ok_or_else(|| {
                         Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                     })?

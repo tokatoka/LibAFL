@@ -1,4 +1,4 @@
-//! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
+//! The generalization stage is part of the `Grimoire` fuzzer
 
 use alloc::{
     string::{String, ToString},
@@ -37,6 +37,9 @@ pub struct GeneralizedIndexesMetadata {
 crate::impl_serdeany!(GeneralizedIndexesMetadata);
 
 impl GeneralizedIndexesMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "generalized_indexes_meta";
+
     /// Create the metadata
     #[must_use]
     pub fn new() -> Self {
@@ -90,10 +93,10 @@ where
     ) -> Result<(), Error> {
         if state
             .metadata()
-            .get::<GeneralizedIndexesMetadata>()
+            .get::<GeneralizedIndexesMetadata>(GeneralizedIndexesMetadata::NAME)
             .is_none()
         {
-            state.add_metadata(GeneralizedIndexesMetadata::new());
+            state.add_metadata(GeneralizedIndexesMetadata::new(), GeneralizedIndexesMetadata::NAME);
         }
 
         let (mut payload, original, novelties) = {
@@ -107,7 +110,7 @@ where
                 drop(entry);
                 state
                     .metadata_mut()
-                    .get_mut::<GeneralizedIndexesMetadata>()
+                    .get_mut::<GeneralizedIndexesMetadata>(GeneralizedIndexesMetadata::NAME)
                     .unwrap()
                     .indexes
                     .insert(corpus_idx);
@@ -337,7 +340,7 @@ where
 
             state
                 .metadata_mut()
-                .get_mut::<GeneralizedIndexesMetadata>()
+                .get_mut::<GeneralizedIndexesMetadata>(GeneralizedIndexesMetadata::NAME)
                 .unwrap()
                 .indexes
                 .insert(corpus_idx);

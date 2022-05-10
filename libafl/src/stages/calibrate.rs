@@ -161,12 +161,12 @@ where
         };
 
         // If weighted scheduler or powerscheduler is used, update it
-        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
+        let use_powerschedule = state.has_metadata::<SchedulerMetadata>(SchedulerMetadata::NAME)
             && state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow()
-                .has_metadata::<SchedulerTestcaseMetaData>();
+                .has_metadata::<SchedulerTestcaseMetaData>(SchedulerTestcaseMetaData::NAME);
 
         if use_powerschedule {
             let map = executor
@@ -176,7 +176,7 @@ where
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
+            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>(SchedulerMetadata::NAME).unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -193,7 +193,7 @@ where
 
             let data = testcase
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetaData>(SchedulerTestcaseMetaData::NAME)
                 .ok_or_else(|| {
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;

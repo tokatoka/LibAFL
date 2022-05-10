@@ -9,6 +9,9 @@ pub struct ConcolicMetadata {
 }
 
 impl ConcolicMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "concolic_meta";
+
     /// Iterates over all messages in the buffer. Does not consume the buffer.
     pub fn iter_messages(&self) -> impl Iterator<Item = (SymExprRef, SymExpr)> + '_ {
         let mut parser = MessageFileReader::from_buffer(&self.buffer);

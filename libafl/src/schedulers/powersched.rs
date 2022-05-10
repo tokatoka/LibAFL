@@ -40,6 +40,9 @@ pub struct SchedulerMetadata {
 
 /// The metadata for runs in the calibration stage.
 impl SchedulerMetadata {
+    /// Default name in the metadata map
+    pub const NAME: &'static str = "scheduler_meta";
+
     /// Creates a new [`struct@SchedulerMetadata`]
     #[must_use]
     pub fn new(strat: Option<PowerSchedule>) -> Self {
@@ -153,8 +156,8 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
-        if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
+        if !state.has_metadata::<SchedulerMetadata>(SchedulerMetadata::NAME) {
+            state.add_metadata(SchedulerMetadata::new(Some(self.strat)), SchedulerMetadata::NAME);
         }
 
         let current_idx = *state.corpus().current();
@@ -165,7 +168,7 @@ where
                 .get(parent_idx)?
                 .borrow_mut()
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetaData>(SchedulerTestcaseMetaData::NAME)
                 .ok_or_else(|| {
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?
@@ -179,7 +182,7 @@ where
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(SchedulerTestcaseMetaData::new(depth));
+            .add_metadata(SchedulerTestcaseMetaData::new(depth), SchedulerTestcaseMetaData::NAME);
         Ok(())
     }
 
@@ -192,7 +195,7 @@ where
                     if *cur + 1 >= state.corpus().count() {
                         let psmeta = state
                             .metadata_mut()
-                            .get_mut::<SchedulerMetadata>()
+                            .get_mut::<SchedulerMetadata>(SchedulerMetadata::NAME)
                             .ok_or_else(|| {
                                 Error::key_not_found("SchedulerMetadata not found".to_string())
                             })?;
@@ -210,7 +213,7 @@ where
             let mut testcase = state.corpus().get(id)?.borrow_mut();
             let tcmeta = testcase
                 .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
+                .get_mut::<SchedulerTestcaseMetaData>(SchedulerTestcaseMetaData::NAME)
                 .ok_or_else(|| {
                     Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;
