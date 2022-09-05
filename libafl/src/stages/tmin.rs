@@ -31,16 +31,13 @@ use crate::{
 /// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
-pub trait TMinMutationalStage<F1, F2, I, M, OT, S, Z>:
-    Stage + FeedbackFactory<F2, I, S, OT>
+pub trait TMinMutationalStage<F1, F2, I, M, OT, S>: Stage + FeedbackFactory<F2, I, S, OT>
 where
     Self::Executor: Executor + HasObservers,
-    Self::EventManager: EventFirer,
     F1: Feedback,
     F2: Feedback,
     Self::Input: Input + Hash + HasLen,
     Self::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
-    Self::Fuzzer: ExecutionProcessor + ExecutesInput + HasFeedback + HasScheduler,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -53,12 +50,15 @@ where
 
     /// Runs this (mutational) stage for new objectives
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_minification(
+    fn perform_minification<
+        EM: EventFirer,
+        Z: ExecutionProcessor + ExecutesInput + HasFeedback + HasScheduler,
+    >(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         base_corpus_idx: usize,
     ) -> Result<(), Error> {
         let orig_max_size = state.max_size();
@@ -162,7 +162,6 @@ where
 pub struct StdTMinMutationalStage<F1, F2, FF, M>
 where
     <Self as Stage>::Executor: Executor + HasObservers,
-    <Self as Stage>::EventManager: EventFirer,
     F1: Feedback,
     F2: Feedback,
     FF: FeedbackFactory<
@@ -173,7 +172,6 @@ where
     >,
     <Self as Stage>::Input: Input + Hash + HasLen,
     <Self as Stage>::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
-    <Self as Stage>::Fuzzer: ExecutionProcessor + ExecutesInput + HasFeedback + HasScheduler,
 {
     mutator: M,
     factory: FF,
@@ -185,7 +183,6 @@ where
 impl<F1, F2, FF, M> Stage for StdTMinMutationalStage<F1, F2, FF, M>
 where
     Self::Executor: Executor + HasObservers,
-    Self::EventManager: EventFirer,
     F1: Feedback,
     F2: Feedback,
     FF: FeedbackFactory<
@@ -196,14 +193,16 @@ where
     >,
     Self::Input: Input + Hash + HasLen,
     Self::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
-    Self::Fuzzer: ExecutionProcessor + ExecutesInput + HasFeedback + HasScheduler,
 {
-    fn perform(
+    fn perform<
+        EM: EventFirer,
+        Z: ExecutionProcessor + ExecutesInput + HasFeedback + HasScheduler,
+    >(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         self.perform_minification(fuzzer, executor, state, manager, corpus_idx)?;
@@ -230,24 +229,23 @@ where
     }
 }
 
-impl<F1, F2, FF, I, M, OT, S, Z> TMinMutationalStage<F1, F2, I, M, OT, S, Z>
+impl<F1, F2, FF, I, M, OT, S> TMinMutationalStage<F1, F2, I, M, OT, S>
     for StdTMinMutationalStage<F1, F2, FF, M>
 where
     Self::Executor: HasObservers + Executor,
-    Self::EventManager: EventFirer,
     F1: Feedback<Input = Self::Input>,
     F2: Feedback<Input = Self::Input>,
     FF: FeedbackFactory<F2, I, S, OT>,
     I: Input + HasLen + Hash,
-    Self: Stage<Input = I, State = S, Fuzzer = Z>,
+    Self: Stage<Input = I, State = S>,
     Self::Executor: HasObservers<Observers = OT>,
     M: Mutator<Input = I, State = S>,
     OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
-    Z: ExecutionProcessor<Input = I, Observers = OT>
-        + ExecutesInput<Input = I, State = S, Fuzzer = Z>
-        + HasFeedback<Feedback = F1>
-        + HasScheduler,
+    //Z: ExecutionProcessor<Input = I, Observers = OT>
+    //    + ExecutesInput<Input = I, State = S>
+    //    + HasFeedback<Feedback = F1>
+    //    + HasScheduler,
 {
     /// The mutator, added to this stage
     #[inline]

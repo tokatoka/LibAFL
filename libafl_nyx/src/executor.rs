@@ -32,7 +32,7 @@ impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
 where
     I: Input + HasBytesVec,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,

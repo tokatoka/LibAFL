@@ -17,7 +17,7 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State},
     Error,
 };
 
@@ -93,7 +93,7 @@ pub trait EvaluatorObservers: Sized {
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
         E: Executor + HasObservers,
-        EM: EventManager<Fuzzer = Self>;
+        EM: EventManager;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
@@ -393,7 +393,7 @@ where
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
         E: Executor + HasObservers,
-        EM: EventManager<Fuzzer = Self>,
+        EM: EventManager,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
@@ -404,7 +404,7 @@ where
 impl Evaluator for StdFuzzer
 where
     Self::Executor: Executor + HasObservers,
-    Self::EventManager: EventManager<Fuzzer = Self>,
+    Self::EventManager: EventManager,
     Self::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -557,8 +557,7 @@ where
 /// Structs with this trait will execute an [`Input`]
 pub trait ExecutesInput {
     type Input: Input;
-    type Fuzzer;
-    type State;
+    type State: State<Input = Self::Input>;
 
     /// Runs the input and triggers observers and feedback
     fn execute_input<E, EM>(

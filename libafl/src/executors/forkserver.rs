@@ -383,11 +383,11 @@ where
     E: Executor + HasForkserver,
 {
     #[inline]
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _mgr: &mut Self::EventManager,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
@@ -850,11 +850,11 @@ where
     SP: ShMemProvider,
 {
     #[inline]
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _mgr: &mut Self::EventManager,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;

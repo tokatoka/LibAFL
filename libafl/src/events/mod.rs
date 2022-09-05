@@ -18,11 +18,11 @@ use uuid::Uuid;
 
 use crate::{
     bolts::current_time,
-    executors::ExitKind,
+    executors::{Executor, ExitKind},
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions},
+    state::{HasClientPerfMonitor, HasExecutions, State},
     Error,
 };
 
@@ -431,16 +431,15 @@ pub trait EventRestarter {
 
 /// [`EventProcessor`] process all the incoming messages
 pub trait EventProcessor {
-    type Executor;
-    type Fuzzer;
+    type Executor: Executor<Input = Self::Input, State = Self::State>;
     type Input;
-    type State;
+    type State: State<Input = Self::Input>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(
+    fn process<Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut Self::Executor,
     ) -> Result<usize, Error>;
@@ -467,10 +466,6 @@ pub trait HasEventManagerId {
 pub trait EventManager:
     EventFirer + EventProcessor + EventRestarter + HasEventManagerId + ProgressReporter
 {
-    type Executor;
-    type Fuzzer;
-    type Input: Input;
-    type State;
 }
 
 /// The handler function for custom buffers exchanged via [`EventManager`]
@@ -502,9 +497,9 @@ impl EventFirer for NopEventManager {
 impl EventRestarter for NopEventManager {}
 
 impl EventProcessor for NopEventManager {
-    fn process(
+    fn process<Z>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
         _executor: &mut Self::Executor,
     ) -> Result<usize, Error> {
@@ -661,9 +656,9 @@ pub mod pybind {
     impl EventProcessor<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
         for PythonEventManager
     {
-        fn process(
+        fn process<Z>(
             &mut self,
-            fuzzer: &mut PythonStdFuzzer,
+            fuzzer: &mut Z,
             state: &mut PythonStdState,
             executor: &mut PythonExecutor,
         ) -> Result<usize, Error> {

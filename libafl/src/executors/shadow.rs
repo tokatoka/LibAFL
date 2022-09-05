@@ -55,11 +55,11 @@ where
     E: Executor,
     SOT: ObserversTuple,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)

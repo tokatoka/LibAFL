@@ -266,11 +266,11 @@ where
     E: Executor + HasInProcessHandlers,
 {
     #[allow(clippy::cast_sign_loss)]
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -334,11 +334,11 @@ impl<E> Executor for TimeoutExecutor<E>
 where
     E: Executor,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -364,11 +364,11 @@ impl<E> Executor for TimeoutExecutor<E>
 where
     E: Executor,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {

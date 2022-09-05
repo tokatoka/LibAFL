@@ -47,9 +47,9 @@ where
     /// The monitor
     monitor: MT,
     /// The events that happened since the last handle_in_broker
-    events: Vec<Event<<Self as EventManager>::Input>>,
+    events: Vec<Event<<Self as EventFirer>::Input>>,
     /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<<Self as EventManager>::State>>>,
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<<Self as EventFirer>::State>>>,
 }
 
 impl<MT> Debug for SimpleEventManager<MT>
@@ -72,7 +72,7 @@ where
     fn fire<S2>(
         &mut self,
         _state: &mut S2,
-        event: Event<<Self as EventManager>::Input>,
+        event: Event<<Self as EventFirer>::Input>,
     ) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
@@ -91,9 +91,9 @@ impl<MT> EventProcessor for SimpleEventManager<MT>
 where
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process(
+    fn process<Z>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         state: &mut Self::State,
         _executor: &mut Self::Executor,
     ) -> Result<usize, Error> {
@@ -156,7 +156,7 @@ where
     #[allow(clippy::unnecessary_wraps)]
     fn handle_in_broker(
         monitor: &mut MT,
-        event: &Event<<Self as EventManager>::Input>,
+        event: &Event<<Self as EventFirer>::Input>,
     ) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
@@ -241,8 +241,8 @@ where
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
     fn handle_in_client(
         &mut self,
-        state: &mut <Self as EventManager>::State,
-        event: Event<<Self as EventManager>::Input>,
+        state: &mut <Self as EventFirer>::State,
+        event: Event<<Self as EventFirer>::Input>,
     ) -> Result<(), Error> {
         if let Event::CustomBuf { tag, buf } = &event {
             for handler in &mut self.custom_buf_handlers {
@@ -304,13 +304,13 @@ where
 #[cfg(feature = "std")]
 impl<SP, MT> EventProcessor for SimpleRestartingEventManager<MT, SP>
 where
-    <Self as EventManager>::State: Serialize,
+    <Self as EventFirer>::State: Serialize,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process(
+    fn process<Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut Self::Executor,
     ) -> Result<usize, Error> {
@@ -321,7 +321,6 @@ where
 #[cfg(feature = "std")]
 impl<MT, SP> EventManager for SimpleRestartingEventManager<MT, SP>
 where
-    <Self as EventManager>::Executor: Executor<EventManager = Self>,
     <Self as Executor>::State: Serialize,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
@@ -337,7 +336,7 @@ where
         &mut self,
         handler: Box<
             dyn FnMut(
-                &mut <Self as EventManager>::State,
+                &mut <Self as EventFirer>::State,
                 &String,
                 &[u8],
             ) -> Result<CustomBufEventResult, Error>,
@@ -388,9 +387,9 @@ where
     pub fn launch(
         mut monitor: MT,
         shmem_provider: &mut SP,
-    ) -> Result<(Option<<Self as EventManager>::State>, Self), Error>
+    ) -> Result<(Option<<Self as EventFirer>::State>, Self), Error>
     where
-        <Self as EventManager>::State: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
+        <Self as EventFirer>::State: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
         MT: Debug,
     {
         // We start ourself as child process to actually fuzz
@@ -453,7 +452,7 @@ where
         };
 
         // If we're restarting, deserialize the old state.
-        let (state, mgr) = match staterestorer.restore::<<Self as EventManager>::State>()? {
+        let (state, mgr) = match staterestorer.restore::<<Self as EventFirer>::State>()? {
             None => {
                 println!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances

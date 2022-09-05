@@ -42,6 +42,7 @@ use crate::{
     events::EventManager,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    prelude::State,
     Error,
 };
 
@@ -115,16 +116,14 @@ pub trait HasObservers: Debug {
 /// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor: Debug {
     type Input: Input;
-    type State;
-    type Fuzzer;
-    type EventManager: EventManager;
+    type State: State<Input = Self::Input>;
 
     /// Instruct the target about the input and run
-    fn run_target(
+    fn run_target<EM: EventManager, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error>;
 
@@ -154,11 +153,11 @@ impl Executor for NopExecutor
 where
     Self::Input: Input + HasTargetBytes,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _mgr: &mut Self::EventManager,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
@@ -311,7 +310,7 @@ pub mod pybind {
         for PyObjectExecutor
     {
         #[inline]
-        fn run_target(
+        fn run_target<EM, Z>(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
             state: &mut PythonStdState,
@@ -426,7 +425,7 @@ pub mod pybind {
 
     impl Executor<PythonEventManager, BytesInput, PythonStdState, PythonStdFuzzer> for PythonExecutor {
         #[inline]
-        fn run_target(
+        fn run_target<EM, Z>(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
             state: &mut PythonStdState,

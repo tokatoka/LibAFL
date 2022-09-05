@@ -67,12 +67,12 @@ pub struct GeneralizationStage {
 impl Stage for GeneralizationStage {
     #[inline]
     #[allow(clippy::too_many_lines)]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         if state
@@ -361,12 +361,8 @@ impl GeneralizationStage {
         input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<
-                EventManager = <Self as Stage>::EventManager,
-                Input = GeneralizedInput,
-                State = <Self as Stage>::State,
-                Fuzzer = <Self as Stage>::Fuzzer,
-            > + HasObservers<Input = GeneralizedInput>,
+        E: Executor<Input = GeneralizedInput, State = <Self as Stage>::State>
+            + HasObservers<Input = GeneralizedInput>,
         O: MapObserver,
     {
         start_timer!(state);
@@ -400,24 +396,20 @@ impl GeneralizationStage {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn find_gaps<E>(
+    fn find_gaps<E, EM, Z>(
         &self,
-        fuzzer: &mut <Self as Stage>::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut <Self as Stage>::Executor,
         state: &mut <Self as Stage>::State,
-        manager: &mut <Self as Stage>::EventManager,
+        manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
         find_next_index: fn(&[Option<u8>], usize, u8) -> usize,
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<
-                EventManager = <Self as Stage>::EventManager,
-                Input = GeneralizedInput,
-                State = <Self as Stage>::State,
-                Fuzzer = <Self as Stage>::Fuzzer,
-            > + HasObservers<Input = GeneralizedInput>,
+        E: Executor<Input = GeneralizedInput, State = <Self as Stage>::State>
+            + HasObservers<Input = GeneralizedInput>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -459,12 +451,8 @@ impl GeneralizationStage {
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<
-                EventManager = <Self as Stage>::EventManager,
-                Input = GeneralizedInput,
-                State = Self,
-                Fuzzer = <Self as Stage>::Fuzzer,
-            > + HasObservers<Input = GeneralizedInput>,
+        E: Executor<Input = GeneralizedInput, State = Self>
+            + HasObservers<Input = GeneralizedInput>,
     {
         let mut index = 0;
         while index < payload.len() {

@@ -34,12 +34,12 @@ where
     Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         self.inner
@@ -352,7 +352,7 @@ where
     #[inline]
     fn perform(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
         manager: &mut EM,

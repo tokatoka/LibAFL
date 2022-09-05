@@ -34,12 +34,12 @@ pub trait MutationalStage: Stage {
 
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
-    fn perform_mutational(
+    fn perform_mutational<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let num = self.iterations(state, corpus_idx)?;
@@ -101,12 +101,12 @@ impl MutationalStage for StdMutationalStage {
 impl Stage for StdMutationalStage {
     #[inline]
     #[allow(clippy::let_and_return)]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);

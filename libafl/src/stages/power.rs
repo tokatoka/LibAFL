@@ -113,12 +113,12 @@ where
 impl<F, O> Stage for PowerMutationalStage<F, O> {
     #[inline]
     #[allow(clippy::let_and_return)]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);

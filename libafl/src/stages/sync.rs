@@ -41,25 +41,24 @@ pub struct SyncFromDiskStage<CB> {
     load_callback: CB,
 }
 
-impl<CB> Stage for SyncFromDiskStage<CB>
+impl<CB, Z> Stage for SyncFromDiskStage<CB>
 where
-    CB: FnMut(
-        &mut <Self as Stage>::Fuzzer,
-        &mut <Self as Stage>::State,
-        &Path,
-    ) -> Result<Self::Input, Error>,
+    CB: FnMut(&mut Z, &mut <Self as Stage>::State, &Path) -> Result<Self::Input, Error>,
     Self::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-    Self::Fuzzer: Evaluator,
+    Z: Evaluator,
 {
     #[inline]
-    fn perform(
+    fn perform<EM, Z2>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         _corpus_idx: usize,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        Z2: Z,
+    {
         let last = state
             .metadata()
             .get::<SyncFromDiskMetadata>()
@@ -88,15 +87,11 @@ where
     }
 }
 
-impl<CB> SyncFromDiskStage<CB>
+impl<CB, Z> SyncFromDiskStage<CB>
 where
-    CB: FnMut(
-        &mut <Self as Stage>::Fuzzer,
-        &mut <Self as Stage>::State,
-        &Path,
-    ) -> Result<<Self as Stage>::Input, Error>,
+    CB: FnMut(&mut Z, &mut <Self as Stage>::State, &Path) -> Result<<Self as Stage>::Input, Error>,
     <Self as Stage>::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-    <Self as Stage>::Fuzzer: Evaluator,
+    Z: Evaluator,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -107,14 +102,14 @@ where
         }
     }
 
-    fn load_from_directory(
+    fn load_from_directory<EM, Z>(
         &mut self,
         in_dir: &Path,
         last: &Option<SystemTime>,
-        fuzzer: &mut <Self as Stage>::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut <Self as Stage>::Executor,
         state: &mut <Self as Stage>::State,
-        manager: &mut <Self as Stage>::EventManager,
+        manager: &mut EM,
     ) -> Result<Option<SystemTime>, Error> {
         let mut max_time = None;
         for entry in fs::read_dir(in_dir)? {
@@ -157,7 +152,7 @@ pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, 
 
 impl<I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>>
 where
-    Self: Stage<Input = I, State = S, Fuzzer = Z>,
+    Self: Stage<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Z: Evaluator,
 {

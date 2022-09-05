@@ -22,21 +22,19 @@ pub struct StagesOwnedList {
             dyn AnyStage<
                 Input = <<Self as StagesTuple>::State as State>::Input,
                 State = <Self as StagesTuple>::State,
-                Fuzzer = <Self as StagesTuple>::Fuzzer,
                 Executor = <Self as StagesTuple>::Executor,
-                EventManager = <Self as StagesTuple>::EventManager,
             >,
         >,
     >,
 }
 
 impl StagesTuple for StagesOwnedList {
-    fn perform_all(
+    fn perform_all<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         for s in &mut self.list {
@@ -49,15 +47,13 @@ impl StagesTuple for StagesOwnedList {
 impl StagesOwnedList {
     /// Create a new instance
     #[must_use]
-    pub fn new(
+    pub fn new<EM>(
         list: Vec<
             Box<
                 dyn AnyStage<
                     Input = <<Self as StagesTuple>::State as State>::Input,
                     State = <Self as StagesTuple>::State,
-                    Fuzzer = <Self as StagesTuple>::Fuzzer,
                     Executor = <Self as StagesTuple>::Executor,
-                    EventManager = <Self as StagesTuple>::EventManager,
                 >,
             >,
         >,

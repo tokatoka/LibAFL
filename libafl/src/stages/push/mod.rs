@@ -249,9 +249,9 @@ pub trait PushStage: Iterator {
     #[inline]
     fn init(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::Stage,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
     ) -> Result<(), Error> {
         Ok(())
@@ -262,9 +262,9 @@ pub trait PushStage: Iterator {
     /// After this stage has finished, or if the stage does not process any inputs, this should return `None`.
     fn pre_exec(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
     ) -> Option<Result<Self::Input, Error>>;
 
@@ -272,9 +272,9 @@ pub trait PushStage: Iterator {
     #[inline]
     fn post_exec(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
         _input: Self::Input,
         _exit_kind: ExitKind,
@@ -286,9 +286,9 @@ pub trait PushStage: Iterator {
     #[inline]
     fn deinit(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
     ) -> Result<(), Error> {
         Ok(())

@@ -40,12 +40,12 @@ where
 {
     #[inline]
     #[allow(clippy::let_and_return, clippy::too_many_lines)]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry

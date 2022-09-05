@@ -83,9 +83,9 @@ where
     /// Creates a new default mutational stage
     fn init(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
     ) -> Result<(), Error> {
         // Find a testcase to work on, unless someone already set it
@@ -103,9 +103,9 @@ where
     #[inline]
     fn deinit(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         _state: &mut Self::State,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
     ) -> Result<(), Error> {
         self.current_corpus_idx = None;
@@ -114,9 +114,9 @@ where
 
     fn pre_exec(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         state: &mut Self::State,
-        _event_mgr: &mut Self::EventManager,
+        _event_mgr: &mut EM,
         _observers: &mut Self::Observers,
     ) -> Option<Result<Self::Input, Error>> {
         if self.testcases_done >= self.testcases_to_do {
@@ -150,9 +150,9 @@ where
 
     fn post_exec(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        event_mgr: &mut Self::EventManager,
+        event_mgr: &mut EM,
         observers: &mut Self::Observers,
         last_input: Self::Input,
         exit_kind: ExitKind,

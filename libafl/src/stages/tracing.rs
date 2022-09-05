@@ -30,12 +30,12 @@ where
     Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         _executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -103,12 +103,12 @@ where
     Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
 {
     #[inline]
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut ShadowExecutor<Self::Executor, SOT>,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         start_timer!(state);

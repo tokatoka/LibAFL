@@ -53,9 +53,9 @@ where
         hooks: &'a mut QemuHooks<'a, I, QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        event_mgr: &mut Self::EventManager,
+        event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
         EM: EventFirer + EventRestarter,
@@ -97,11 +97,11 @@ where
     OT: ObserversTuple,
     QT: QemuHelperTuple<I, S>,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
@@ -170,9 +170,9 @@ where
         hooks: &'a mut QemuHooks<'a, I, QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        event_mgr: &mut Self::EventManager,
+        event_mgr: &mut EM,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
@@ -225,11 +225,11 @@ where
     QT: QemuHelperTuple<I, S>,
     SP: ShMemProvider,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();

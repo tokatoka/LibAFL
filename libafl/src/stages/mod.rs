@@ -11,7 +11,6 @@ use core::marker::PhantomData;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
 pub mod tmin;
-use regex::internal::Exec;
 pub use tmin::{
     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
 };
@@ -47,6 +46,8 @@ pub mod sync;
 pub use sync::*;
 
 use self::push::PushStage;
+use crate::executors::Executor;
+use crate::prelude::State;
 use crate::{
     executors::HasObservers,
     inputs::Input,
@@ -59,46 +60,45 @@ use crate::{
 pub trait Stage {
     type Input: Input;
     type State: HasClientPerfMonitor + HasCorpus<Input = Self::Input>;
-    type Fuzzer: Evaluator<Input = Self::Input, State = Self::State, Executor = Self::Executor>;
     type Executor;
-    type EventManager;
 
     /// Run the stage
-    fn perform(
+    fn perform<
+        EM,
+        Z: Evaluator<Input = Self::Input, State = Self::State, Executor = Self::Executor>,
+    >(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
 pub trait StagesTuple {
-    type Executor;
-    type EventManager;
-    type State;
-    type Fuzzer;
+    type Executor: Executor<State = Self::State>;
+    type State: State;
 
     /// Performs all `Stages` in this tuple
-    fn perform_all(
+    fn perform_all<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
 
 impl StagesTuple for () {
-    fn perform_all(
+    fn perform_all<EM, Z>(
         &mut self,
-        _: &mut Self::Fuzzer,
+        _: &mut Z,
         _: &mut Self::Executor,
         _: &mut Self::State,
-        _: &mut Self::EventManager,
+        _: &mut EM,
         _: usize,
     ) -> Result<(), Error> {
         Ok(())
@@ -108,19 +108,14 @@ impl StagesTuple for () {
 impl<Head, Tail> StagesTuple for (Head, Tail)
 where
     Head: Stage,
-    Tail: StagesTuple<
-        Executor = Self::Executor,
-        EventManager = Self::EventManager,
-        State = Self::State,
-        Fuzzer = Self::Fuzzer,
-    >,
+    Tail: StagesTuple<Executor = Self::Executor, State = Self::State>,
 {
-    fn perform_all(
+    fn perform_all<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         // Perform the current stage
@@ -135,40 +130,30 @@ where
 
 /// A [`Stage`] that will call a closure
 #[derive(Debug)]
-pub struct ClosureStage<CB>
+pub struct ClosureStage<CB, EM, Z>
 where
-    CB: FnMut(
-        &mut <Self as Stage>::Fuzzer,
-        &mut <Self as Stage>::Executor,
-        &mut <Self as Stage>::State,
-        &mut <Self as Stage>::EventManager,
-    ),
+    CB: FnMut(&mut Z, &mut <Self as Stage>::Executor, &mut <Self as Stage>::State, &mut EM),
 {
     closure: CB,
+    phantom: PhantomData<(EM, Z)>,
 }
 
-impl<CB> Stage for ClosureStage<CB>
+impl<CB, EM, Z> Stage for ClosureStage<CB, EM, Z>
 where
-    CB: FnMut(
-        &mut Self::Fuzzer,
-        &mut Self::Executor,
-        &mut Self::State,
-        &mut Self::EventManager,
-        usize,
-    ) -> Result<(), Error>,
-    Self::Fuzzer: Fuzzer<
+    CB: FnMut(&mut Z, &mut Self::Executor, &mut Self::State, &mut EM, usize) -> Result<(), Error>,
+    Z: Fuzzer<
         Executor = Self::Executor,
         Input = Self::Input,
         State = Self::State,
-        EventManager = Self::EventManager,
+        EventManager = EM,
     >,
 {
     fn perform(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut Self::EventManager,
+        manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         Ok(())
@@ -177,21 +162,24 @@ where
 }
 
 /// A stage that takes a closure
-impl<CB> ClosureStage<CB> {
+impl<CB, EM, Z> ClosureStage<CB, EM, Z> {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
-        Self { closure }
+        Self {
+            closure,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<CB> From<CB> for ClosureStage<CB>
+impl<CB, EM, Z> From<CB> for ClosureStage<CB, EM, Z>
 where
     CB: FnMut(
-        &mut <Self as Stage>::Fuzzer,
+        &mut Z,
         &mut <Self as Stage>::Executor,
         &mut <Self as Stage>::State,
-        &mut <Self as Stage>::EventManager,
+        &mut EM,
         usize,
     ) -> Result<(), Error>,
 {
@@ -224,12 +212,12 @@ where
 }
 
 impl<PS> Stage for PushStageAdapter<PS> {
-    fn perform(
+    fn perform<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         executor: &mut Self::Executor,
         state: &mut Self::State,
-        event_mgr: &mut Self::EventManager,
+        event_mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
@@ -287,7 +275,7 @@ impl From<bool> for SkippableStageDecision {
 pub struct SkippableStage<CD, E, EM, S, ST, Z>
 where
     CD: FnMut(&mut S) -> SkippableStageDecision,
-    ST: Stage<Executor = E, EventManager = EM, State = S, Fuzzer = Z>,
+    ST: Stage<Executor = E, State = S>,
 {
     wrapped_stage: ST,
     condition: CD,
@@ -297,7 +285,7 @@ where
 impl<CD, E, EM, S, ST, Z> SkippableStage<CD, E, EM, S, ST, Z>
 where
     CD: FnMut(&mut S) -> SkippableStageDecision,
-    ST: Stage<Executor = E, EventManager = EM, State = S, Fuzzer = Z>,
+    ST: Stage<Executor = E, State = S>,
 {
     /// Create a new [`SkippableStage`]
     pub fn new(wrapped_stage: ST, condition: CD) -> Self {
@@ -312,7 +300,7 @@ where
 impl<CD, E, EM, S, ST, Z> Stage for SkippableStage<CD, E, EM, S, ST, Z>
 where
     CD: FnMut(&mut S) -> SkippableStageDecision,
-    ST: Stage<Executor = E, EventManager = EM, State = S, Fuzzer = Z>,
+    ST: Stage<Executor = E, State = S>,
 {
     /// Run the stage
     #[inline]

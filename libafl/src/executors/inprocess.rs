@@ -90,11 +90,11 @@ where
     H: FnMut(&Self::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
 {
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut Self::EventManager,
+        mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
@@ -1418,11 +1418,11 @@ where
 {
     #[allow(unreachable_code)]
     #[inline]
-    fn run_target(
+    fn run_target<EM, Z>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z,
         state: &mut Self::State,
-        _mgr: &mut Self::EventManager,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {

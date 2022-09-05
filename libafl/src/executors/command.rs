@@ -308,11 +308,11 @@ where
     OT: Debug + MatchName,
     T: Debug,
 {
-    fn run_target(
+    fn run_target<EM2, Z2>(
         &mut self,
-        _fuzzer: &mut Self::Fuzzer,
+        _fuzzer: &mut Z2,
         _state: &mut Self::State,
-        _mgr: &mut Self::EventManager,
+        _mgr: &mut EM2,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;

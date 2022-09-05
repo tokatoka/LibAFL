@@ -253,7 +253,7 @@ where
 {
     llmp: LlmpClient<SP>,
     /// The custom buf handler
-    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<<Self as EventManager>::State>>>,
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<<Self as EventFirer>::State>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     configuration: EventConfig,
@@ -375,13 +375,13 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut <Self as EventManager>::State,
+        state: &mut <Self as EventFirer>::State,
         _client_id: u32,
-        event: Event<<Self as EventManager>::Input>,
+        event: Event<<Self as EventFirer>::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple + DeserializeOwned,
-        E: Executor<EventManager = Self, Fuzzer = Z> + HasObservers,
+        E: Executor + HasObservers,
         Z: ExecutionProcessor + EvaluatorObservers,
     {
         match event {
@@ -440,7 +440,7 @@ where
     fn fire<S2>(
         &mut self,
         _state: &mut S2,
-        event: Event<<Self as EventManager>::Input>,
+        event: Event<<Self as EventFirer>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         let flags: Flags = LLMP_FLAG_INITIALIZED;
@@ -489,13 +489,13 @@ where
 impl<OT, SP> EventProcessor for LlmpEventManager<OT, SP>
 where
     SP: ShMemProvider,
-    Self::Executor: Executor<EventManager = Self> + HasObservers,
+    Self::Executor: Executor + HasObservers,
     OT: ObserversTuple + DeserializeOwned,
-    Self::Fuzzer: ExecutionProcessor + EvaluatorObservers, //CE: CustomEvent<I>,
+    // Self::Fuzzer: ExecutionProcessor + EvaluatorObservers, //CE: CustomEvent<I>,
 {
-    fn process(
+    fn process<Z: ExecutionProcessor + EvaluatorObservers>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut Self::Executor,
     ) -> Result<usize, Error> {
@@ -532,10 +532,8 @@ where
 
 impl<OT, SP> EventManager for LlmpEventManager<OT, SP>
 where
-    <Self as EventManager>::Executor: Executor<EventManager = Self> + HasObservers,
     OT: ObserversTuple + DeserializeOwned,
     SP: ShMemProvider,
-    <Self as EventManager>::Fuzzer: ExecutionProcessor + EvaluatorObservers, //CE: CustomEvent<I>,
 {
 }
 
@@ -548,7 +546,7 @@ where
         &mut self,
         handler: Box<
             dyn FnMut(
-                &mut <Self as EventManager>::Input,
+                &mut <Self as EventFirer>::Input,
                 &String,
                 &[u8],
             ) -> Result<CustomBufEventResult, Error>,
@@ -643,16 +641,14 @@ where
 #[cfg(feature = "std")]
 impl<OT, SP> EventProcessor for LlmpRestartingEventManager<OT, SP>
 where
-    Self::Executor:
-        Executor<EventManager = LlmpEventManager<OT, SP>, Fuzzer = Self::Fuzzer> + HasObservers,
-    Self::Fuzzer: ExecutionProcessor + EvaluatorObservers,
+    Self::Executor: Executor + HasObservers,
     OT: ObserversTuple + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
-    fn process(
+    fn process<Z: ExecutionProcessor + EvaluatorObservers>(
         &mut self,
-        fuzzer: &mut Self::Fuzzer,
+        fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut Self::Executor,
     ) -> Result<usize, Error> {
@@ -663,9 +659,7 @@ where
 #[cfg(feature = "std")]
 impl<OT, SP> EventManager for LlmpRestartingEventManager<OT, SP>
 where
-    <Self as EventManager>::Executor: Executor + HasObservers,
-    <Self as EventManager>::State: Serialize,
-    <Self as EventManager>::Fuzzer: ExecutionProcessor + EvaluatorObservers,
+    <Self as EventFirer>::State: Serialize,
     OT: ObserversTuple + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
@@ -763,7 +757,7 @@ where
 pub struct RestartingMgr<MT, OT, SP>
 where
     OT: ObserversTuple + DeserializeOwned,
-    <Self as EventManager>::State: DeserializeOwned,
+    <Self as EventFirer>::State: DeserializeOwned,
     SP: ShMemProvider + 'static,
     MT: Monitor,
     //CE: CustomEvent<I>,
@@ -791,9 +785,9 @@ where
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
 impl<MT, OT, SP> RestartingMgr<MT, OT, SP>
 where
-    <Self as EventManager>::Input: Input,
+    <Self as EventFirer>::Input: Input,
     OT: ObserversTuple + DeserializeOwned,
-    <Self as EventManager>::State: DeserializeOwned,
+    <Self as EventFirer>::State: DeserializeOwned,
     SP: ShMemProvider,
     MT: Monitor + Clone,
 {
@@ -802,7 +796,7 @@ where
         &mut self,
     ) -> Result<
         (
-            Option<<Self as EventManager>::State>,
+            Option<<Self as EventFirer>::State>,
             LlmpRestartingEventManager<OT, SP>,
         ),
         Error,
@@ -812,7 +806,7 @@ where
             .is_err()
         {
             let broker_things =
-                |mut broker: LlmpEventBroker<<Self as EventManager>::Input, MT, SP>,
+                |mut broker: LlmpEventBroker<<Self as EventFirer>::Input, MT, SP>,
                  remote_broker_addr| {
                     if let Some(remote_broker_addr) = remote_broker_addr {
                         println!("B2b: Connecting to {:?}", &remote_broker_addr);
@@ -830,7 +824,7 @@ where
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
                             let event_broker =
-                                LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new(
+                                LlmpEventBroker::<<Self as EventFirer>::Input, MT, SP>::new(
                                     broker,
                                     self.monitor.take().unwrap(),
                                 )?;
@@ -852,7 +846,7 @@ where
                 }
                 ManagerKind::Broker => {
                     let event_broker =
-                        LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new_on_port(
+                        LlmpEventBroker::<<Self as EventFirer>::Input, MT, SP>::new_on_port(
                             self.shmem_provider.clone(),
                             self.monitor.take().unwrap(),
                             self.broker_port,
