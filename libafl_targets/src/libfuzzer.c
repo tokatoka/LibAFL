@@ -5,33 +5,44 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 EXT_FUNC(LLVMFuzzerInitialize, int, (int *argc, char ***argv), false);
 EXT_FUNC(LLVMFuzzerCustomMutator, size_t,
-         (uint8_t *Data, size_t Size, size_t MaxSize, unsigned int Seed),
+         (uint8_t * Data, size_t Size, size_t MaxSize, unsigned int Seed),
          false);
 EXT_FUNC(LLVMFuzzerCustomCrossOver, size_t,
-         (const uint8_t *Data1, size_t Size1,
-          const uint8_t *Data2, size_t Size2,
-          uint8_t *Out, size_t MaxOutSize, unsigned int Seed),
+         (const uint8_t *Data1, size_t Size1, const uint8_t *Data2,
+          size_t Size2, uint8_t *Out, size_t MaxOutSize, unsigned int Seed),
          false);
-EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (uint8_t *Data, size_t Size), false) {
+EXT_FUNC_IMPL(LLVMFuzzerTestOneInput, int, (const uint8_t *Data, size_t Size),
+              false) {
   return 0;
 }
 
 EXT_FUNC_IMPL(libafl_main, void, (void), false) {
 }
 
+EXT_FUNC(libafl_main, void, (void), false);
+extern int LLVMFuzzerRunDriver(int *argc, char ***argv,
+                               int (*UserCb)(const uint8_t *Data, size_t Size));
+
 #ifndef FUZZER_NO_LINK_MAIN
-EXT_FUNC_IMPL(main, int, (int argc, char** argv), false) {
-  libafl_main();
-  return 0;
+EXT_FUNC_IMPL(main, int, (int argc, char **argv), false) {
+  if (CHECK_WEAK_FN(libafl_main)) {
+    libafl_main();
+    return 0;
+  }
+  return LLVMFuzzerRunDriver(&argc, &argv, &LLVMFuzzerTestOneInput);
 }
 
-#if defined(_WIN32)
-// If we do not add the main, the MSVC linker fails with: 
+  #if defined(_WIN32)
+// If we do not add the main, the MSVC linker fails with:
 // LINK : fatal error LNK1561: entry point must be defined
-int main(int argc, char** argv) {
-   libafl_main();
+int main(int argc, char **argv) {
+  if (CHECK_WEAK_FN(libafl_main)) {
+    libafl_main();
+    return 0;
+  }
+  return LLVMFuzzerRunDriver(&argc, &argv, &LLVMFuzzerTestOneInput);
 }
-#endif
+  #endif
 #endif
 
 #pragma GCC diagnostic pop
@@ -58,7 +69,10 @@ EXPORT_FN int libafl_targets_has_libfuzzer_custom_mutator() {
 }
 
 // trust the user to check this appropriately :)
-EXPORT_FN size_t libafl_targets_libfuzzer_custom_mutator(uint8_t *Data, size_t Size, size_t MaxSize, unsigned int Seed) {
+EXPORT_FN size_t libafl_targets_libfuzzer_custom_mutator(uint8_t     *Data,
+                                                         size_t       Size,
+                                                         size_t       MaxSize,
+                                                         unsigned int Seed) {
   return LLVMFuzzerCustomMutator(Data, Size, MaxSize, Seed);
 }
 
@@ -67,8 +81,9 @@ EXPORT_FN int libafl_targets_has_libfuzzer_custom_crossover() {
 }
 
 // trust the user to check this appropriately :)
-EXPORT_FN size_t libafl_targets_libfuzzer_custom_crossover(const uint8_t *Data1, size_t Size1,
-                                                           const uint8_t *Data2, size_t Size2,
-                                                           uint8_t *Out, size_t MaxOutSize, unsigned int Seed) {
-  return LLVMFuzzerCustomCrossOver(Data1, Size1, Data2, Size2, Out, MaxOutSize, Seed);
+EXPORT_FN size_t libafl_targets_libfuzzer_custom_crossover(
+    const uint8_t *Data1, size_t Size1, const uint8_t *Data2, size_t Size2,
+    uint8_t *Out, size_t MaxOutSize, unsigned int Seed) {
+  return LLVMFuzzerCustomCrossOver(Data1, Size1, Data2, Size2, Out, MaxOutSize,
+                                   Seed);
 }
