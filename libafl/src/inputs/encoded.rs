@@ -9,7 +9,6 @@ use alloc::{
     vec::Vec,
 };
 #[cfg(feature = "std")]
-use core::str::from_utf8;
 use core::{cell::RefCell, convert::From, hash::Hasher};
 
 use ahash::AHasher;
@@ -266,17 +265,20 @@ pub struct NaiveTokenizer {
     comment_re: Regex,
     /// String regex
     string_re: Regex,
+    /// replacement character regex
+    replace_re: Regex,
 }
 
 #[cfg(feature = "std")]
 impl NaiveTokenizer {
     /// Creates a new [`NaiveTokenizer`]
     #[must_use]
-    pub fn new(ident_re: Regex, comment_re: Regex, string_re: Regex) -> Self {
+    pub fn new(ident_re: Regex, comment_re: Regex, string_re: Regex, replace_re: Regex) -> Self {
         Self {
             ident_re,
             comment_re,
             string_re,
+            replace_re,
         }
     }
 }
@@ -291,6 +293,8 @@ impl Default for NaiveTokenizer {
             comment_re: Regex::new(r"(/\*[^*]*\*/)").unwrap(),
             // " and ' string regex
             string_re: Regex::new("\"(\\\\|\\\\\"|[^\"])*\"|'(\\\\|\\\\'|[^'])*'").unwrap(),
+            // replacement character regex
+            replace_re: Regex::new("[\u{FFFD}]").unwrap(),
         }
     }
 }
@@ -304,9 +308,10 @@ impl Tokenizer for NaiveTokenizer {
         encoding_type: TokenizationKind,
     ) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
-        let string =
-            from_utf8(bytes).map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
+        let stringer = String::from_utf8_lossy(bytes).into_owned(); //.unwrap();
+        let string: &str = &stringer;
         let string = self.comment_re.replace_all(string, "").to_string();
+        let string = self.replace_re.replace_all(&string, "").to_string();
         let mut str_prev = 0;
         for str_match in self.string_re.find_iter(&string) {
             if str_match.start() > str_prev {
