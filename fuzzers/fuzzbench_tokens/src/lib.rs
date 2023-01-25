@@ -297,10 +297,6 @@ fn fuzz(
 
     let mut tokenizer = NaiveTokenizer::default();
     let encoder_decoder = Rc::new(RefCell::new(TokenInputEncoderDecoder::new()));
-    encoder_decoder
-        .borrow_mut()
-        .set_encoding_type(TokenizationKind::WithWhitespace)
-        .unwrap();
 
     let mut initial_inputs = vec![];
     let mut decoded_bytes = vec![];
@@ -333,7 +329,6 @@ fn fuzz(
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &mut EncodedInput| {
         decoded_bytes.clear();
-        encoder_decoder_harness.borrow_mut().repair(input);
         encoder_decoder_harness
             .borrow_mut()
             .decode(input, &mut decoded_bytes)
@@ -357,7 +352,6 @@ fn fuzz(
     let dump_to_disk_stage = DumpToDiskStage::new(
         |input: &mut EncodedInput| {
             let mut dump_to_disk_bytes = vec![];
-            encoder_decoder_harness.borrow_mut().repair(input);
             encoder_decoder_harness
                 .borrow_mut()
                 .decode(input, &mut dump_to_disk_bytes)?;
