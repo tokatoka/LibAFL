@@ -114,10 +114,6 @@ fn main() {
         println!("cargo:rerun-if-changed=src/libfuzzer.c");
 
         let mut build = cc::Build::new();
-        #[cfg(feature = "dataflow")]
-        {
-            build.flag("-fsanitize=dataflow");
-        }
         build.file(src_dir.join("libfuzzer.c")).compile("libfuzzer");
     }
 
