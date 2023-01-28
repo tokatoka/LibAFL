@@ -14,6 +14,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
+    generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
@@ -143,10 +144,25 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
+        // state
+        //     .load_initial_inputs(
+        //         &mut fuzzer,
+        //         &mut executor,
+        //         &mut mgr,
+        //         corpus_dirs,
+        //     )
+        //     .expect("Failed to generate the initial corpus");
+        // Generate 8 initial inputs
+        let mut generator = RandBytesGenerator::new(32);
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-            .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", corpus_dirs));
-        println!("We imported {} inputs from disk.", state.corpus().count());
+            .generate_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut generator,
+                &mut restarting_mgr,
+                16,
+            )
+            .unwrap();
     }
 
     // Setup a tracing stage in which we log comparisons
