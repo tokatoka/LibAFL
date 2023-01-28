@@ -137,7 +137,7 @@ fn build_pass(
             .arg("-o")
             .arg(out_dir.join(format!("{src_stub}.{}", dll_extension())))
             .status()
-            .unwrap_or_else(|_| panic!("Failed to compile {src_file}"))
+            .unwrap_or_else(|e| panic!("Failed to compile {src_file}: {e}"))
             .success());
     } else if cfg!(windows) {
         println!("{cxxflags:?}");
@@ -154,7 +154,7 @@ fn build_pass(
                     .display()
             ))
             .status()
-            .unwrap_or_else(|_| panic!("Failed to compile {src_file}"))
+            .unwrap_or_else(|e| panic!("Failed to compile {src_file}: {e}"))
             .success());
     }
 }
