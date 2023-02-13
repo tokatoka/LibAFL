@@ -1,5 +1,5 @@
 use core::ffi::c_int;
-use std::{env::temp_dir, fs::create_dir, net::TcpListener, path::PathBuf};
+use std::net::TcpListener;
 
 use libafl::{
     bolts::{

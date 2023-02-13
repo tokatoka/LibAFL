@@ -1,6 +1,5 @@
 use core::{ffi::c_void, fmt::Debug};
 use std::{
-    ptr::{read_volatile, write_volatile},
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
@@ -17,7 +16,7 @@ use libafl::{
 use libc::SIGILL;
 use serde::{Deserialize, Serialize};
 
-use crate::sanitizer_ifaces::__sanitizer_install_malloc_and_free_hooks;
+
 
 extern "C" {
     fn libafl_check_malloc_size(ptr: *const c_void) -> usize;
@@ -25,12 +24,13 @@ extern "C" {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static OOMED: AtomicBool = AtomicBool::new(false);
-static RSS_MAX: AtomicUsize = AtomicUsize::new(2 << 30); // 2GB, which is the default
+static RSS_MAX: AtomicUsize = AtomicUsize::new(2 << 30);
+// 2GB, which is the default
 static MALLOC_MAX: AtomicUsize = AtomicUsize::new(2 << 30);
 
 static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 
-pub extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
+pub extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = match unsafe { libafl_check_malloc_size(ptr) } {
             0 => size, // either the malloc size function didn't work or it's really zero-sized
@@ -50,7 +50,7 @@ pub extern "C" fn oom_malloc_hook(ptr: *const c_void, size: usize) {
     }
 }
 
-pub extern "C" fn oom_free_hook(ptr: *const c_void) {
+pub extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
         if MALLOC_SIZE
@@ -74,13 +74,6 @@ impl OOMObserver {
     pub fn new(rss_max: usize, malloc_max: usize) -> Self {
         RSS_MAX.store(rss_max, Ordering::Relaxed);
         MALLOC_MAX.store(malloc_max, Ordering::Relaxed);
-        unsafe {
-            if __sanitizer_install_malloc_and_free_hooks(Some(oom_malloc_hook), Some(oom_free_hook))
-                == 0
-            {
-                panic!("Could not install malloc and free hooks");
-            }
-        }
         Self { oomed: false }
     }
 }
@@ -97,6 +90,8 @@ where
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         OOMED.store(false, Ordering::Relaxed);
+        // must reset for platforms which do not offer malloc tracking
+        MALLOC_SIZE.store(0, Ordering::Relaxed);
         RUNNING.store(true, Ordering::Relaxed);
         Ok(())
     }

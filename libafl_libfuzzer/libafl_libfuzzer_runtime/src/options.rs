@@ -30,6 +30,7 @@ pub enum LibfuzzerMode {
     Fuzz,
     Merge,
     Cmin,
+    Report,
 }
 
 #[derive(Debug)]
@@ -230,6 +231,14 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                             if parse_or_bail!(name, value, u64) > 0
                                 && *self.mode.get_or_insert(LibfuzzerMode::Cmin)
                                     != LibfuzzerMode::Cmin
+                            {
+                                return Err(OptionsParseError::MultipleModesSelected);
+                            }
+                        }
+                        "report" => {
+                            if parse_or_bail!(name, value, u64) > 0
+                                && *self.mode.get_or_insert(LibfuzzerMode::Report)
+                                    != LibfuzzerMode::Report
                             {
                                 return Err(OptionsParseError::MultipleModesSelected);
                             }

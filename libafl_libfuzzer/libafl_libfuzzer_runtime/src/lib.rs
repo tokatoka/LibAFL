@@ -5,6 +5,7 @@ use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 pub(crate) mod feedbacks;
 mod fuzz;
 mod options;
+mod report;
 
 use mimalloc::MiMalloc;
 #[global_allocator]
@@ -67,14 +68,15 @@ macro_rules! make_fuzz_closure {
                 powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
             },
             stages::{
-                CalibrationStage, GeneralizationStage, SkippableStage, StdMutationalStage, StdPowerMutationalStage,
-                TracingStage,
+                CalibrationStage, GeneralizationStage, MapEqualityFactory, SkippableStage, StdMutationalStage,
+                StdPowerMutationalStage, StdTMinMutationalStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS, OOMFeedback, OOMObserver};
         use rand::{thread_rng, RngCore};
+        use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
         use crate::CustomMutationStatus;
         use crate::BACKTRACE;
@@ -131,6 +133,8 @@ macro_rules! make_fuzz_closure {
 
             // New maximization map feedback linked to the edges observer
             let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, grimoire);
+
+            let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
@@ -329,7 +333,7 @@ macro_rules! make_fuzz_closure {
             let mut executor = TimeoutExecutor::new(
                 InProcessExecutor::new(
                     &mut harness,
-                    tuple_list!(oom_observer, edges_observer, time_observer, backtrace_observer),
+                    tuple_list!(edges_observer, time_observer, backtrace_observer, oom_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
@@ -369,6 +373,13 @@ macro_rules! make_fuzz_closure {
                 }
             }
 
+            let minimizer = StdScheduledMutator::new(havoc_mutations());
+            let tmin = StdTMinMutationalStage::new(
+                minimizer,
+                map_eq_factory,
+                1 << 5
+            );
+
             // Setup a tracing stage in which we log comparisons
             let tracing = TracingStage::new(InProcessExecutor::new(
                 &mut tracing_harness,
@@ -380,6 +391,7 @@ macro_rules! make_fuzz_closure {
 
             // The order of the stages matter!
             let mut stages = tuple_list!(
+                tmin,
                 generalization,
                 calibration,
                 tracing,
@@ -436,7 +448,16 @@ pub fn LLVMFuzzerRunDriver(
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
         LibfuzzerMode::Merge => unimplemented!(),
         LibfuzzerMode::Cmin => unimplemented!(),
+        LibfuzzerMode::Report => report::report(options, harness),
     };
-    res.expect("Encountered error while performing libfuzzer shimming");
-    0
+    if res.is_err() {
+        let err = res.unwrap_err();
+        eprintln!(
+            "Encountered error while performing libfuzzer shimming: {}",
+            err
+        );
+        1
+    } else {
+        0
+    }
 }
