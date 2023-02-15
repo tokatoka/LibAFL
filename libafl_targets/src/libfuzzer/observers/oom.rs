@@ -1,7 +1,5 @@
 use core::{ffi::c_void, fmt::Debug};
-use std::{
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
-};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use libafl::{
     bolts::tuples::Named,
@@ -15,8 +13,6 @@ use libafl::{
 };
 use libc::SIGILL;
 use serde::{Deserialize, Serialize};
-
-
 
 extern "C" {
     fn libafl_check_malloc_size(ptr: *const c_void) -> usize;

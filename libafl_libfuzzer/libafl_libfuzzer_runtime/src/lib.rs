@@ -140,7 +140,8 @@ macro_rules! make_fuzz_closure {
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = SkippableStage::new(generalization, |_| grimoire.into());
 
-            let calibration = CalibrationStage::new(&map_feedback);
+            let calibration1 = CalibrationStage::new(&map_feedback);
+            let calibration2 = CalibrationStage::new(&map_feedback);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
@@ -311,7 +312,7 @@ macro_rules! make_fuzz_closure {
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler =
-                IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
+                IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, PowerSchedule::FAST));
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -391,9 +392,10 @@ macro_rules! make_fuzz_closure {
 
             // The order of the stages matter!
             let mut stages = tuple_list!(
+                calibration1,
                 tmin,
+                calibration2,
                 generalization,
-                calibration,
                 tracing,
                 i2s,
                 cm_i2s,
