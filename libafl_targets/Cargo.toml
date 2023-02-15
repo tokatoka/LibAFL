@@ -35,11 +35,8 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.9.0", default-features = false, features = [] }
-<<<<<<< HEAD
 log = "0.4.17"
-=======
 libc = "0.2"
->>>>>>> 42058879 (support for oom when using ASAN + LLVMFuzzerInitialize)
 
 rangemap = "1.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
