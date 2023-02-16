@@ -77,6 +77,7 @@ macro_rules! make_fuzz_closure {
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS, OOMFeedback, OOMObserver};
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf, collections::vec_deque::VecDeque};
+        use utf8_chars::BufReadCharsExt;
 
         use crate::CustomMutationStatus;
         use crate::BACKTRACE;
@@ -94,14 +95,32 @@ macro_rules! make_fuzz_closure {
                     eprintln!("WARNING: cowardly refusing to use grimoire since we cannot determine if the input is primarily text; set -grimoire=1 or provide a corpus directory.");
                     false
                 } else {
-                    // TODO determine if the corpus is mostly text to conditionally enable grimoire
+                    let mut non_utf8: usize = 0;
+                    let mut utf8 = 0;
                     let mut input_queue = VecDeque::new();
-                    for dir in $options.dirs() {
-                        if let Ok(entries) = std::fs::read_dir(dir) {
+                    input_queue.extend($options.dirs().iter().cloned());
+                    while let Some(entry) = input_queue.pop_front() {
+                        if entry.is_dir() {
+                            if let Ok(entries) = std::fs::read_dir(entry) {
+                                for entry in entries {
+                                    let entry = entry?;
+                                    input_queue.push_back(entry.path());
+                                }
+                            }
+                        } else if entry.is_file() {
+                            let mut reader = std::io::BufReader::new(std::fs::File::open(entry)?);
+                            if reader.chars().all(|maybe_c| maybe_c.is_ok()) {
+                                utf8 += 1;
+                            } else {
+                                non_utf8 += 1;
+                            }
                         }
                     }
-                    eprintln!("INFO: inferred grimoire mutator; if this is undesired, set -grimoire=0");
-                    true
+                    let enabled = utf8 > non_utf8; // greater-than so zero testcases doesn't enable
+                    if enabled {
+                        eprintln!("INFO: inferred grimoire mutator (found {}/{} UTF-8 inputs); if this is undesired, set -grimoire=0", utf8, utf8 + non_utf8);
+                    }
+                    enabled
                 }
             } else {
                 false
