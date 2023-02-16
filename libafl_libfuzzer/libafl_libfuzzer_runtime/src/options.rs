@@ -178,6 +178,10 @@ impl LibfuzzerOptions {
         self.malloc_limit
     }
 
+    pub fn tui(&self) -> bool {
+        self.tui
+    }
+
     pub fn unknown(&self) -> &[String] {
         &self.unknown
     }

@@ -1,5 +1,7 @@
 use core::ffi::{c_char, c_int, CStr};
 
+use libafl::Error;
+
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
 pub(crate) mod feedbacks;
@@ -43,8 +45,8 @@ impl CustomMutationStatus {
     }
 }
 
-macro_rules! make_fuzz_closure {
-    ($options:ident, $harness:ident, $operation:expr) => {{
+macro_rules! fuzz_with {
+    ($options:ident, $harness:ident, $operation:expr, $and_then:expr, $edge_maker:expr) => {{
         use libafl::{
             bolts::{
                 current_nanos,
@@ -63,7 +65,7 @@ macro_rules! make_fuzz_closure {
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
                 I2SRandReplace, StdMOptMutator, StdScheduledMutator, Tokens, tokens_mutations
             },
-            observers::{BacktraceObserver, HitcountsMapObserver, StdMapObserver, TimeObserver},
+            observers::{BacktraceObserver, TimeObserver},
             schedulers::{
                 powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
             },
@@ -74,7 +76,7 @@ macro_rules! make_fuzz_closure {
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
-        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS, OOMFeedback, OOMObserver};
+        use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OOMFeedback, OOMObserver};
         use rand::{thread_rng, RngCore};
         use std::{env::temp_dir, fs::create_dir, path::PathBuf, collections::vec_deque::VecDeque};
         use utf8_chars::BufReadCharsExt;
@@ -83,7 +85,9 @@ macro_rules! make_fuzz_closure {
         use crate::BACKTRACE;
         use crate::feedbacks::LibfuzzerKeepFeedback;
 
-        |state: Option<_>, mut mgr, _cpu_id| {
+        let edge_maker = &$edge_maker;
+
+        let closure = |state: Option<_>, mut mgr, _cpu_id| {
             let mutator_status = CustomMutationStatus::new();
             let grimoire = if let Some(grimoire) = $options.grimoire() {
                 if grimoire && !mutator_status.std_mutational {
@@ -126,15 +130,11 @@ macro_rules! make_fuzz_closure {
                 false
             };
 
+            let edges_observer = edge_maker();
+
             let crashes = $options.forks().is_none() || !$options.ignore_crashes();
             let ooms = $options.forks().is_none() || !$options.ignore_ooms();
             let timeouts = $options.forks().is_none() || !$options.ignore_timeouts();
-
-            // Create an observation channel using the coverage map
-            let edges = unsafe { &mut COUNTERS_MAPS };
-            assert_eq!(1, edges.len());
-            let edges_observer =
-                HitcountsMapObserver::new(unsafe { StdMapObserver::new("edges", &mut edges[0]) });
 
             let keep_observer = LibfuzzerKeepFeedback::new();
             let keep = keep_observer.keep();
@@ -440,11 +440,51 @@ macro_rules! make_fuzz_closure {
             );
 
             $operation(&mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
+        };
+
+        $and_then(closure)
+    }};
+
+    ($options:ident, $harness:ident, $operation:expr, $and_then:expr) => {{
+        use libafl::observers::{
+            HitcountsIterableMapObserver, HitcountsMapObserver, MultiMapObserver, StdMapObserver,
+        };
+        use libafl_targets::COUNTERS_MAPS;
+
+        // Create an observation channel using the coverage map
+        if unsafe { COUNTERS_MAPS.len() } == 1 {
+            fuzz_with!($options, $harness, $operation, $and_then, || {
+                let edges = unsafe { &mut COUNTERS_MAPS };
+                let edges_observer =
+                    HitcountsMapObserver::new(unsafe { StdMapObserver::new("edges", &mut edges[0]) });
+                edges_observer
+            })
+        } else if unsafe { COUNTERS_MAPS.len() } > 1 {
+            fuzz_with!($options, $harness, $operation, $and_then, || {
+                let edges = unsafe { &mut COUNTERS_MAPS };
+                let edges_observer =
+                    HitcountsIterableMapObserver::new(MultiMapObserver::new("edges", edges));
+                edges_observer
+            })
+        } else {
+            panic!("No maps available; cannot fuzz!")
         }
     }};
 }
 
-pub(crate) use make_fuzz_closure;
+pub(crate) use fuzz_with;
+
+#[inline(always)]
+pub fn start_fuzzing_single<F, S, EM>(
+    mut fuzz_single: F,
+    initial_state: Option<S>,
+    mgr: EM,
+) -> Result<(), Error>
+where
+    F: FnMut(Option<S>, EM, usize) -> Result<(), Error>,
+{
+    fuzz_single(initial_state, mgr, 0)
+}
 
 extern "C" {
     // redeclaration against libafl_targets because the pointers in our case may be mutable

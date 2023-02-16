@@ -11,7 +11,7 @@ use libafl::{
     Error, Fuzzer,
 };
 
-use crate::{make_fuzz_closure, options::LibfuzzerOptions};
+use crate::{fuzz_with, options::LibfuzzerOptions};
 
 fn do_report<F, ST, E, S, EM>(
     _fuzzer: &mut F,
@@ -46,7 +46,8 @@ pub fn report(
     options: LibfuzzerOptions,
     harness: &extern "C" fn(*const u8, usize) -> c_int,
 ) -> Result<(), Error> {
-    let reporter = make_fuzz_closure!(options, harness, do_report);
-    let mgr = SimpleEventManager::new(SimpleMonitor::new(|s| eprintln!("{s}")));
-    reporter(None, mgr, 0)
+    fuzz_with!(options, harness, do_report, |reporter| {
+        let mgr = SimpleEventManager::new(SimpleMonitor::new(|s| eprintln!("{s}")));
+        crate::start_fuzzing_single(reporter, None, mgr)
+    })
 }
