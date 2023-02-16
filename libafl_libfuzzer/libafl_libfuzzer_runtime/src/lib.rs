@@ -86,7 +86,7 @@ macro_rules! make_fuzz_closure {
             let mutator_status = CustomMutationStatus::new();
             let grimoire = if let Some(grimoire) = $options.grimoire() {
                 if grimoire && !mutator_status.std_mutational {
-                    eprintln!("WARNING: cowardlyz refusing to use grimoire after detecting the presence of a custom mutator");
+                    eprintln!("WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator");
                 }
                 grimoire && mutator_status.std_mutational
             } else if mutator_status.std_mutational {
