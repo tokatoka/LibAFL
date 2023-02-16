@@ -103,6 +103,7 @@ pub struct LibfuzzerOptions {
     ignore_timeouts: bool,
     ignore_ooms: bool,
     rss_limit: usize,
+    tui: bool,
     unknown: Vec<String>,
     pub malloc_limit: usize,
 }
@@ -197,6 +198,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     rss_limit: Option<usize>,
     malloc_limit: Option<usize>,
     ignore_remaining: bool,
+    tui: bool,
     unknown: Vec<&'a str>,
 }
 
@@ -273,6 +275,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         "ignore_remaining_args" => {
                             self.ignore_remaining = parse_or_bail!(name, value, u64) > 0
                         }
+                        "tui" => self.tui = parse_or_bail!(name, value, u64) > 0,
                         _ => {
                             eprintln!("warning: unrecognised flag {name}");
                             self.unknown.push(arg)
@@ -309,6 +312,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                 0 => usize::MAX,
                 value => value,
             },
+            tui: self.tui,
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })
     }

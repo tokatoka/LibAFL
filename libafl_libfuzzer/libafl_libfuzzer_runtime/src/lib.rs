@@ -170,6 +170,13 @@ macro_rules! make_fuzz_closure {
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_and_fast!(
+                feedback_not!(
+                    feedback_or_fast!(
+                        OOMFeedback,
+                        CrashFeedback::new(),
+                        TimeoutFeedback::new()
+                    )
+                ),
                 keep_observer,
                 feedback_or!(
                     map_feedback,
@@ -366,8 +373,8 @@ macro_rules! make_fuzz_closure {
                 $options.timeout(),
             );
 
-            // In case the corpus is empty (on first run), reset
-            if state.corpus().count() < 1 {
+            // In case the corpus is empty (on first run) or crashed while loading, reset
+            if state.must_load_initial_inputs() {
                 if !$options.dirs().is_empty() {
                     // Load from disk
                     state
