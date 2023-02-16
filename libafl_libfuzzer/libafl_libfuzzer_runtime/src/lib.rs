@@ -68,15 +68,15 @@ macro_rules! make_fuzz_closure {
                 powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
             },
             stages::{
-                CalibrationStage, GeneralizationStage, MapEqualityFactory, SkippableStage, StdMutationalStage,
-                StdPowerMutationalStage, StdTMinMutationalStage, TracingStage,
+                CalibrationStage, GeneralizationStage, SkippableStage, StdMutationalStage,
+                StdPowerMutationalStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, COUNTERS_MAPS, OOMFeedback, OOMObserver};
         use rand::{thread_rng, RngCore};
-        use std::{env::temp_dir, fs::create_dir, path::PathBuf};
+        use std::{env::temp_dir, fs::create_dir, path::PathBuf, collections::vec_deque::VecDeque};
 
         use crate::CustomMutationStatus;
         use crate::BACKTRACE;
@@ -86,7 +86,7 @@ macro_rules! make_fuzz_closure {
             let mutator_status = CustomMutationStatus::new();
             let grimoire = if let Some(grimoire) = $options.grimoire() {
                 if grimoire && !mutator_status.std_mutational {
-                    eprintln!("WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator");
+                    eprintln!("WARNING: cowardlyz refusing to use grimoire after detecting the presence of a custom mutator");
                 }
                 grimoire && mutator_status.std_mutational
             } else if mutator_status.std_mutational {
@@ -95,6 +95,11 @@ macro_rules! make_fuzz_closure {
                     false
                 } else {
                     // TODO determine if the corpus is mostly text to conditionally enable grimoire
+                    let mut input_queue = VecDeque::new();
+                    for dir in $options.dirs() {
+                        if let Ok(entries) = std::fs::read_dir(dir) {
+                        }
+                    }
                     eprintln!("INFO: inferred grimoire mutator; if this is undesired, set -grimoire=0");
                     true
                 }
@@ -134,14 +139,14 @@ macro_rules! make_fuzz_closure {
             // New maximization map feedback linked to the edges observer
             let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, grimoire);
 
-            let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
+            // let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = SkippableStage::new(generalization, |_| grimoire.into());
 
             let calibration1 = CalibrationStage::new(&map_feedback);
-            let calibration2 = CalibrationStage::new(&map_feedback);
+            // let calibration2 = CalibrationStage::new(&map_feedback);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR
@@ -374,12 +379,13 @@ macro_rules! make_fuzz_closure {
                 }
             }
 
-            let minimizer = StdScheduledMutator::new(havoc_mutations());
-            let tmin = StdTMinMutationalStage::new(
-                minimizer,
-                map_eq_factory,
-                1 << 5
-            );
+            // we don't support shrink as of now... it would require duplicating the mutators above
+            // let minimizer = StdScheduledMutator::new(havoc_mutations());
+            // let tmin = StdTMinMutationalStage::new(
+            //     minimizer,
+            //     map_eq_factory,
+            //     1 << 5
+            // );
 
             // Setup a tracing stage in which we log comparisons
             let tracing = TracingStage::new(InProcessExecutor::new(
@@ -393,8 +399,8 @@ macro_rules! make_fuzz_closure {
             // The order of the stages matter!
             let mut stages = tuple_list!(
                 calibration1,
-                tmin,
-                calibration2,
+                // tmin,
+                // calibration2,
                 generalization,
                 tracing,
                 i2s,
