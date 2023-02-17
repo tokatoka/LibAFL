@@ -385,17 +385,17 @@ macro_rules! fuzz_with {
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
                 if state.corpus().count() < 1 {
-                    // Generator of printable bytearrays of max size 32
-                    let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(32));
+                    // Generator of bytearrays of max size 64
+                    let mut generator = RandBytesGenerator::from(RandBytesGenerator::new(64));
 
-                    // Generate 8 initial inputs
+                    // Generate 1024 initial inputs
                     state
                         .generate_initial_inputs(
                             &mut fuzzer,
                             &mut executor,
                             &mut generator,
                             &mut mgr,
-                            8,
+                            1 << 10,
                         )
                         .expect("Failed to generate the initial corpus");
                     println!(
