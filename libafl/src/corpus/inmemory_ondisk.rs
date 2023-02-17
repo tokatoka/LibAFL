@@ -207,7 +207,11 @@ where
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,
     ) -> Result<Self, Error> {
-        fs::create_dir_all(dir_path)?;
+        match fs::create_dir_all(dir_path) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
         Ok(InMemoryOnDiskCorpus {
             inner: InMemoryCorpus::new(),
             dir_path: dir_path.into(),
