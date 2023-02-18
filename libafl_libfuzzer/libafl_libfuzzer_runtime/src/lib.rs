@@ -522,7 +522,7 @@ pub fn LLVMFuzzerRunDriver(
             .map(|cstr| cstr.to_str().unwrap()),
     )
     .unwrap();
-    if options.dirs().iter().all(|maybe_dir| maybe_dir.is_file()) {
+    if !options.dirs().is_empty() && options.dirs().iter().all(|maybe_dir| maybe_dir.is_file()) {
         // we've been requested to just run some inputs. Do so.
         for input in options.dirs() {
             let input = BytesInput::from_file(input).expect(&format!(
