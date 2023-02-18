@@ -496,11 +496,6 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
-unsafe extern "C" fn libafl_libfuzzer_asan_death_callback() {
-    libafl_cmplog_enabled = 0;
-    panic!("Received ASAN crash, time to go!");
-}
-
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn LLVMFuzzerRunDriver(
@@ -511,12 +506,6 @@ pub extern "C" fn LLVMFuzzerRunDriver(
     let harness = harness_fn
         .as_ref()
         .expect("Illegal harness provided to libafl.");
-
-    unsafe {
-        libafl_targets::sanitizer_ifaces::__sanitizer_set_death_callback(Some(
-            libafl_libfuzzer_asan_death_callback,
-        ))
-    }
 
     unsafe {
         // it appears that no one, not even libfuzzer, uses this return value
