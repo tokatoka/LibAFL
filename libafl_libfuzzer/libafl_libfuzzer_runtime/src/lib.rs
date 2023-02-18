@@ -161,7 +161,7 @@ macro_rules! fuzz_with {
             );
 
             // New maximization map feedback linked to the edges observer
-            let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, grimoire);
+            let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
             // let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
 
