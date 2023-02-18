@@ -94,6 +94,7 @@ static long area_is_valid(const void *ptr, size_t len) {
 
 void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
                                               const uint8_t *ptr2, size_t len) {
+  libafl_cmplog_enabled = false;
   uint32_t hits;
 
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_RTN) {
@@ -111,6 +112,7 @@ void __libafl_targets_cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
   hits &= CMPLOG_MAP_RTN_H - 1;
   MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v0, ptr1, len);
   MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v1, ptr2, len);
+  libafl_cmplog_enabled = true;
 }
 
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,

@@ -5,7 +5,6 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
-use libc::SIGILL;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
