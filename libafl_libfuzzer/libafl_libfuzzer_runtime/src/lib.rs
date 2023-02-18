@@ -116,7 +116,7 @@ macro_rules! fuzz_with {
                                     input_queue.push_back(entry.path());
                                 }
                             }
-                        } else if entry.is_file() {
+                        } else if entry.is_file() && entry.extension().map_or(true, |ext| ext != "metadata" && ext != "lafl_lock") {
                             let mut reader = std::io::BufReader::new(std::fs::File::open(entry)?);
                             if reader.chars().all(|maybe_c| maybe_c.is_ok()) {
                                 utf8 += 1;
