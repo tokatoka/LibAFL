@@ -1,6 +1,10 @@
 use core::ffi::{c_char, c_int, CStr};
 
-use libafl::Error;
+use libafl::{
+    bolts::AsSlice,
+    inputs::{BytesInput, HasTargetBytes, Input},
+    Error,
+};
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
@@ -518,6 +522,17 @@ pub fn LLVMFuzzerRunDriver(
             .map(|cstr| cstr.to_str().unwrap()),
     )
     .unwrap();
+    if options.dirs().iter().all(|maybe_dir| maybe_dir.is_file()) {
+        // we've been requested to just run some inputs. Do so.
+        for input in options.dirs() {
+            let input = BytesInput::from_file(input).expect(&format!(
+                "Couldn't load input {}",
+                input.to_string_lossy().as_ref()
+            ));
+            libafl_targets::libfuzzer::libfuzzer_test_one_input(input.target_bytes().as_slice());
+        }
+        return 0;
+    }
     let res = match options.mode() {
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
         LibfuzzerMode::Merge => unimplemented!(),
