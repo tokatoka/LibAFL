@@ -80,7 +80,7 @@ pub mod sancov_cmp;
 pub use sancov_cmp::*;
 
 #[cfg(feature = "sanitizer_ifaces")]
-mod sanitizer_ifaces {
+pub mod sanitizer_ifaces {
     #![allow(non_snake_case)]
     #![allow(non_camel_case_types)]
     #![allow(non_upper_case_globals)]

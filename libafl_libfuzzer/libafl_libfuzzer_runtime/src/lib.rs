@@ -5,6 +5,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
+use libc::SIGILL;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
@@ -495,9 +496,13 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
+unsafe extern "C" fn libafl_libfuzzer_asan_death_callback() {
+    libc::raise(SIGILL);
+}
+
 #[allow(non_snake_case)]
 #[no_mangle]
-pub fn LLVMFuzzerRunDriver(
+pub extern "C" fn LLVMFuzzerRunDriver(
     argc: *mut c_int,
     argv: *mut *mut *const c_char,
     harness_fn: Option<extern "C" fn(*const u8, usize) -> c_int>,
@@ -505,6 +510,12 @@ pub fn LLVMFuzzerRunDriver(
     let harness = harness_fn
         .as_ref()
         .expect("Illegal harness provided to libafl.");
+
+    unsafe {
+        libafl_targets::sanitizer_ifaces::__sanitizer_set_death_callback(Some(
+            libafl_libfuzzer_asan_death_callback,
+        ))
+    }
 
     unsafe {
         // it appears that no one, not even libfuzzer, uses this return value
