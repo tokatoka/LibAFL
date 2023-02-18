@@ -497,7 +497,7 @@ extern "C" {
 }
 
 unsafe extern "C" fn libafl_libfuzzer_asan_death_callback() {
-    libc::raise(SIGILL);
+    panic!("Received ASAN crash, time to go!");
 }
 
 #[allow(non_snake_case)]
