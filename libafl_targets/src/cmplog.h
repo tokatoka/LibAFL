@@ -60,6 +60,7 @@ void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
 static inline void __libafl_targets_cmplog(uintptr_t k, uint8_t shape,
                                            uint64_t arg1, uint64_t arg2) {
   if (!libafl_cmplog_enabled) { return; }
+  libafl_cmplog_enabled = false;
 
   uint16_t hits;
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
@@ -77,6 +78,7 @@ static inline void __libafl_targets_cmplog(uintptr_t k, uint8_t shape,
   hits &= CMPLOG_MAP_H - 1;
   libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
   libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_enabled = true;
 }
 
 #endif
