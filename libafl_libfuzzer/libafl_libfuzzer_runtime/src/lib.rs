@@ -5,6 +5,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
+use libafl_targets::libafl_cmplog_enabled;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
@@ -496,6 +497,7 @@ extern "C" {
 }
 
 unsafe extern "C" fn libafl_libfuzzer_asan_death_callback() {
+    libafl_cmplog_enabled = 0;
     panic!("Received ASAN crash, time to go!");
 }
 
