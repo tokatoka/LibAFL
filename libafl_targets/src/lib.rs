@@ -87,6 +87,7 @@ pub mod sanitizer_ifaces {
     #![allow(unused)]
     #![allow(improper_ctypes)]
     #![allow(clippy::unreadable_literal)]
+    #![allow(missing_docs)]
     include!(concat!(env!("OUT_DIR"), "/sanitizer_ifaces.rs"));
 }
 
