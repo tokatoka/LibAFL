@@ -123,6 +123,7 @@ void __sanitizer_weak_hook_memcmp(void *called_pc, const void *s1,
   if (result != 0) {
     uintptr_t k = (uintptr_t)called_pc;
     k = (k >> 4) ^ (k << 8);
+    k &= CMPLOG_MAP_W - 1;
 
     __libafl_targets_cmplog_routines_len(k, s1, s2, n);
   }
@@ -133,6 +134,7 @@ void __sanitizer_weak_hook_strncmp(void *called_pc, const char *s1,
   if (result != 0) {
     uintptr_t k = (uintptr_t)called_pc;
     k = (k >> 4) ^ (k << 8);
+    k &= CMPLOG_MAP_W - 1;
 
     size_t actual_len;
     for (actual_len = 0; actual_len < n; actual_len++) {
@@ -153,6 +155,7 @@ void __sanitizer_weak_hook_strcmp(void *called_pc, const char *s1,
   if (result != 0) {
     uintptr_t k = (uintptr_t)called_pc;
     k = (k >> 4) ^ (k << 8);
+    k &= CMPLOG_MAP_W - 1;
 
     size_t actual_len;
     for (actual_len = 0;; actual_len++) {
