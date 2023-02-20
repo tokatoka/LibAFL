@@ -29,7 +29,7 @@ fn parse_option(arg: &str) -> Option<RawOption> {
 pub enum LibfuzzerMode {
     Fuzz,
     Merge,
-    Cmin,
+    Tmin,
     Report,
 }
 
@@ -241,8 +241,8 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "minimize_crash" => {
                             if parse_or_bail!(name, value, u64) > 0
-                                && *self.mode.get_or_insert(LibfuzzerMode::Cmin)
-                                    != LibfuzzerMode::Cmin
+                                && *self.mode.get_or_insert(LibfuzzerMode::Tmin)
+                                    != LibfuzzerMode::Tmin
                             {
                                 return Err(OptionsParseError::MultipleModesSelected);
                             }
