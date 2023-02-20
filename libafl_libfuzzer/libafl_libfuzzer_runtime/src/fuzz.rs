@@ -49,10 +49,12 @@ where
             ExitKind::Oom if !options.ignore_ooms() => halt = true,
             ExitKind::Crash if !options.ignore_crashes() => halt = true,
             ExitKind::Timeout if !options.ignore_timeouts() => halt = true,
-            _ => {}
+            _ => {
+                log::info!("Ignoring {kind:?} according to requested ignore rules.");
+            }
         }
         if halt {
-            eprintln!("Halting; the error on the next line is actually okay. :)");
+            log::info!("Halting; the error on the next line is actually okay. :)");
             return Err(Error::shutting_down());
         }
     }

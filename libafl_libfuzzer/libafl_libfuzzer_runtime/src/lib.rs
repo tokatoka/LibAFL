@@ -61,7 +61,7 @@ macro_rules! fuzz_with {
             corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
-            feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
+            feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
             inputs::{BytesInput, HasTargetBytes},
             mutators::{
@@ -183,11 +183,11 @@ macro_rules! fuzz_with {
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_or_fast!(
-                LibfuzzerCrashCauseFeedback::new(),
+                LibfuzzerCrashCauseFeedback::new($options.artifact_prefix().cloned()),
                 OOMFeedback,
                 feedback_and_fast!(
                     CrashFeedback::new(),
-                    NewHashFeedback::new(&backtrace_observer)
+                    feedback_or_fast!(ConstFeedback::new($options.dedup()), NewHashFeedback::new(&backtrace_observer))
                 ),
                 TimeoutFeedback::new()
             );
