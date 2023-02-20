@@ -1,6 +1,10 @@
 #include "common.h"
 #include <stddef.h>
-#include <malloc.h>
+#ifdef __APPLE__
+  #include <malloc/malloc.h>
+#else
+  #include <malloc.h>
+#endif
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"

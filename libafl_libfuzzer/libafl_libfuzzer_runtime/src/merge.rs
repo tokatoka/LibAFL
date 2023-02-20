@@ -10,15 +10,14 @@ use libafl::{
     corpus::{Corpus, CorpusMinimizer, InMemoryCorpus, OnDiskCorpus, StdCorpusMinimizer},
     events::SimpleEventManager,
     executors::{inprocess::TimeoutInProcessForkExecutor, ExitKind},
-    feedback_and_fast, feedback_not,
-    feedbacks::{CrashFeedback, MapFeedbackMetadata, MaxMapFeedback, TimeoutFeedback},
+    feedbacks::{MapFeedbackMetadata, MaxMapFeedback},
     inputs::{BytesInput, HasTargetBytes, UsesInput},
     observers::{
         HitcountsIterableMapObserver, MapObserver, MultiMapObserver, Observer, StdMapObserver,
         TimeObserver,
     },
     schedulers::QueueScheduler,
-    state::{HasCorpus, HasMetadata, HasNamedMetadata, HasRand, StdState},
+    state::{HasCorpus, HasNamedMetadata, HasRand, StdState},
     Error, StdFuzzer,
 };
 use libafl_targets::COUNTERS_MAPS;
@@ -113,22 +112,16 @@ pub fn merge(
 
     let cmin = StdCorpusMinimizer::new(&parent_edges);
 
-    let map_feedback = MaxMapFeedback::new(&parent_edges);
+    let mut map_feedback = MaxMapFeedback::new(&parent_edges);
     let map_feedback_name = map_feedback.name().to_string();
 
     let observers = tuple_list!(copier, parent_edges, time);
-
-    let mut feedback = feedback_and_fast!(
-        map_feedback,
-        feedback_not!(TimeoutFeedback::new()),
-        feedback_not!(CrashFeedback::new())
-    );
 
     let mut state = StdState::new(
         rand,
         OnDiskCorpus::new(corpus_dir.clone()).unwrap(),
         InMemoryCorpus::new(),
-        &mut feedback,
+        &mut map_feedback,
         &mut (), // no objectives
     )?;
 
@@ -137,7 +130,7 @@ pub fn merge(
     // scheduler doesn't really matter here
     let scheduler = QueueScheduler::new();
 
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, ());
+    let mut fuzzer = StdFuzzer::new(scheduler, map_feedback, ());
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
