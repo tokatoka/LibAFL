@@ -14,6 +14,7 @@ use libafl::{
 use crate::{fuzz_with, options::LibfuzzerOptions};
 
 fn do_report<F, ST, E, S, EM>(
+    _options: &LibfuzzerOptions,
     _fuzzer: &mut F,
     _stages: &mut ST,
     _executor: &mut E,

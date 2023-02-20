@@ -39,5 +39,5 @@ log = "0.4.17"
 libc = "0.2"
 
 rangemap = "1.0"
-serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
 # serde-big-array = "0.3.2"

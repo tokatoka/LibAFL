@@ -5,7 +5,6 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes, Input},
     Error,
 };
-use libafl_targets::libafl_cmplog_enabled;
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
@@ -62,7 +61,7 @@ macro_rules! fuzz_with {
             corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
             executors::{ExitKind, InProcessExecutor, TimeoutExecutor},
             feedback_and_fast, feedback_not, feedback_or, feedback_or_fast,
-            feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
+            feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, TimeFeedback, TimeoutFeedback},
             generators::RandBytesGenerator,
             inputs::{BytesInput, HasTargetBytes},
             mutators::{
@@ -88,7 +87,7 @@ macro_rules! fuzz_with {
 
         use crate::CustomMutationStatus;
         use crate::BACKTRACE;
-        use crate::feedbacks::LibfuzzerKeepFeedback;
+        use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback};
 
         let edge_maker = &$edge_maker;
 
@@ -137,10 +136,6 @@ macro_rules! fuzz_with {
 
             let edges_observer = edge_maker();
 
-            let crashes = $options.forks().is_none() || !$options.ignore_crashes();
-            let ooms = $options.forks().is_none() || !$options.ignore_ooms();
-            let timeouts = $options.forks().is_none() || !$options.ignore_timeouts();
-
             let keep_observer = LibfuzzerKeepFeedback::new();
             let keep = keep_observer.keep();
 
@@ -176,11 +171,7 @@ macro_rules! fuzz_with {
             // This one is composed by two Feedbacks in OR
             let mut feedback = feedback_and_fast!(
                 feedback_not!(
-                    feedback_or_fast!(
-                        OOMFeedback,
-                        CrashFeedback::new(),
-                        TimeoutFeedback::new()
-                    )
+                    CrashFeedback::new()
                 ),
                 keep_observer,
                 feedback_or!(
@@ -192,12 +183,13 @@ macro_rules! fuzz_with {
 
             // A feedback to choose if an input is a solution or not
             let mut objective = feedback_or_fast!(
-                feedback_and_fast!(ConstFeedback::new(ooms), OOMFeedback),
+                LibfuzzerCrashCauseFeedback::new(),
+                OOMFeedback,
                 feedback_and_fast!(
-                    feedback_and_fast!(ConstFeedback::new(crashes), feedback_not!(OOMFeedback), CrashFeedback::new()),
+                    CrashFeedback::new(),
                     NewHashFeedback::new(&backtrace_observer)
                 ),
-                feedback_and_fast!(ConstFeedback::new(timeouts), TimeoutFeedback::new())
+                TimeoutFeedback::new()
             );
 
             let corpus_dir = if let Some(main) = $options.dirs().first() {
@@ -444,7 +436,7 @@ macro_rules! fuzz_with {
                 grimoire,
             );
 
-            $operation(&mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
+            $operation(&$options, &mut fuzzer, &mut stages, &mut executor, &mut state, &mut mgr)
         };
 
         $and_then(closure)
@@ -496,11 +488,6 @@ extern "C" {
     fn libafl_targets_libfuzzer_init(argc: *mut c_int, argv: *mut *mut *const c_char) -> i32;
 }
 
-unsafe extern "C" fn libafl_libfuzzer_asan_death_callback() {
-    libafl_cmplog_enabled = 0;
-    panic!("Received ASAN crash, time to go!");
-}
-
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn LLVMFuzzerRunDriver(
@@ -511,12 +498,6 @@ pub extern "C" fn LLVMFuzzerRunDriver(
     let harness = harness_fn
         .as_ref()
         .expect("Illegal harness provided to libafl.");
-
-    unsafe {
-        libafl_targets::sanitizer_ifaces::__sanitizer_set_death_callback(Some(
-            libafl_libfuzzer_asan_death_callback,
-        ))
-    }
 
     unsafe {
         // it appears that no one, not even libfuzzer, uses this return value
@@ -551,14 +532,14 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         LibfuzzerMode::Cmin => unimplemented!(),
         LibfuzzerMode::Report => report::report(options, harness),
     };
-    if res.is_err() {
-        let err = res.unwrap_err();
-        eprintln!(
-            "Encountered error while performing libfuzzer shimming: {}",
-            err
-        );
-        1
-    } else {
-        0
+    match res {
+        Ok(()) | Err(Error::ShuttingDown) => 0,
+        Err(err) => {
+            eprintln!(
+                "Encountered error while performing libfuzzer shimming: {}",
+                err
+            );
+            1
+        }
     }
 }

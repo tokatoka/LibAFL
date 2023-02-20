@@ -7,17 +7,20 @@ use libafl::{
         launcher::Launcher,
         shmem::{ShMemProvider, StdShMemProvider},
     },
+    corpus::Corpus,
     events::{EventConfig, ProgressReporter, SimpleEventManager, SimpleRestartingEventManager},
+    executors::ExitKind,
     inputs::UsesInput,
     monitors::{tui::TuiMonitor, SimpleMonitor},
     stages::StagesTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasSolutions, UsesState},
     Error, Fuzzer,
 };
 
-use crate::{fuzz_with, options::LibfuzzerOptions};
+use crate::{feedbacks::LibfuzzerCrashCauseMetadata, fuzz_with, options::LibfuzzerOptions};
 
 fn do_fuzz<F, ST, E, S, EM>(
+    options: &LibfuzzerOptions,
     fuzzer: &mut F,
     stages: &mut ST,
     executor: &mut E,
@@ -26,11 +29,33 @@ fn do_fuzz<F, ST, E, S, EM>(
 ) -> Result<(), Error>
 where
     F: Fuzzer<E, EM, ST, State = S>,
-    S: HasClientPerfMonitor + HasMetadata + HasExecutions + UsesInput,
+    S: HasClientPerfMonitor + HasMetadata + HasExecutions + UsesInput + HasSolutions,
     E: UsesState<State = S>,
     EM: ProgressReporter<State = S>,
     ST: StagesTuple<E, EM, S, F>,
 {
+    if let Some(solution) = state.solutions().last() {
+        let kind = state
+            .solutions()
+            .get(solution)
+            .expect("Last solution was not available")
+            .borrow()
+            .metadata()
+            .get::<LibfuzzerCrashCauseMetadata>()
+            .expect("Crash cause not attached to solution")
+            .kind();
+        let mut halt = false;
+        match kind {
+            ExitKind::Oom if !options.ignore_ooms() => halt = true,
+            ExitKind::Crash if !options.ignore_crashes() => halt = true,
+            ExitKind::Timeout if !options.ignore_timeouts() => halt = true,
+            _ => {}
+        }
+        if halt {
+            eprintln!("Halting; the error on the next line is actually okay. :)");
+            return Err(Error::shutting_down());
+        }
+    }
     fuzzer.fuzz_loop(stages, executor, state, mgr)?;
     Ok(())
 }

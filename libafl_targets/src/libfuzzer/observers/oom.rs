@@ -120,6 +120,12 @@ where
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Default)]
 pub struct OOMFeedback;
 
+impl OOMFeedback {
+    pub fn oomed() -> bool {
+        OOMED.load(Ordering::Relaxed)
+    }
+}
+
 impl Named for OOMFeedback {
     fn name(&self) -> &str {
         "oom"
@@ -142,6 +148,6 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(OOMED.load(Ordering::Relaxed))
+        Ok(Self::oomed())
     }
 }
