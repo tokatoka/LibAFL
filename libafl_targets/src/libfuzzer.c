@@ -91,10 +91,10 @@ EXPORT_FN size_t libafl_targets_libfuzzer_custom_crossover(
 }
 
 EXPORT_FN size_t libafl_check_malloc_size(void *ptr) {
-#if defined(__GNUC__)
-  return malloc_usable_size(ptr);
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
   return malloc_size(ptr);
+#elif defined(__GNUC__)
+  return malloc_usable_size(ptr);
 #elif defined(_WIN32)
   return _msize(ptr);
 #else
