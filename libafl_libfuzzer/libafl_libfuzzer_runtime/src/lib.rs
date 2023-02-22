@@ -8,9 +8,10 @@ use libafl::{
 
 use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
-pub(crate) mod feedbacks;
+mod feedbacks;
 mod fuzz;
 mod merge;
+mod misc;
 mod options;
 mod report;
 
@@ -18,9 +19,9 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-pub static mut BACKTRACE: Option<u64> = None;
+static mut BACKTRACE: Option<u64> = None;
 
-pub(crate) struct CustomMutationStatus {
+struct CustomMutationStatus {
     std_mutational: bool,
     std_no_mutate: bool,
     std_no_crossover: bool,
@@ -29,7 +30,7 @@ pub(crate) struct CustomMutationStatus {
 }
 
 impl CustomMutationStatus {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         let custom_mutation = libafl_targets::libfuzzer::has_custom_mutator();
         let custom_crossover = libafl_targets::libfuzzer::has_custom_crossover();
 
@@ -83,57 +84,18 @@ macro_rules! fuzz_with {
         };
         use libafl_targets::{CmpLogObserver, LLVMCustomMutator, OOMFeedback, OOMObserver};
         use rand::{thread_rng, RngCore};
-        use std::{env::temp_dir, fs::create_dir, path::PathBuf, collections::vec_deque::VecDeque};
-        use utf8_chars::BufReadCharsExt;
+        use std::{env::temp_dir, fs::create_dir, path::PathBuf};
 
-        use crate::CustomMutationStatus;
-        use crate::BACKTRACE;
+        use crate::{BACKTRACE, CustomMutationStatus};
         use crate::feedbacks::{LibfuzzerCrashCauseFeedback, LibfuzzerKeepFeedback};
+        use crate::misc::should_use_grimoire;
 
         let edge_maker = &$edge_maker;
 
-        let closure = |state: Option<_>, mut mgr, _cpu_id| {
+        let closure = |mut state: Option<_>, mut mgr, _cpu_id| {
             let mutator_status = CustomMutationStatus::new();
-            let grimoire = if let Some(grimoire) = $options.grimoire() {
-                if grimoire && !mutator_status.std_mutational {
-                    eprintln!("WARNING: cowardly refusing to use grimoire after detecting the presence of a custom mutator");
-                }
-                grimoire && mutator_status.std_mutational
-            } else if mutator_status.std_mutational {
-                if $options.dirs().is_empty() {
-                    eprintln!("WARNING: cowardly refusing to use grimoire since we cannot determine if the input is primarily text; set -grimoire=1 or provide a corpus directory.");
-                    false
-                } else {
-                    let mut non_utf8: usize = 0;
-                    let mut utf8 = 0;
-                    let mut input_queue = VecDeque::new();
-                    input_queue.extend($options.dirs().iter().cloned());
-                    while let Some(entry) = input_queue.pop_front() {
-                        if entry.is_dir() {
-                            if let Ok(entries) = std::fs::read_dir(entry) {
-                                for entry in entries {
-                                    let entry = entry?;
-                                    input_queue.push_back(entry.path());
-                                }
-                            }
-                        } else if entry.is_file() && entry.extension().map_or(true, |ext| ext != "metadata" && ext != "lafl_lock") {
-                            let mut reader = std::io::BufReader::new(std::fs::File::open(entry)?);
-                            if reader.chars().all(|maybe_c| maybe_c.is_ok()) {
-                                utf8 += 1;
-                            } else {
-                                non_utf8 += 1;
-                            }
-                        }
-                    }
-                    let enabled = utf8 > non_utf8; // greater-than so zero testcases doesn't enable
-                    if enabled {
-                        eprintln!("INFO: inferred grimoire mutator (found {}/{} UTF-8 inputs); if this is undesired, set -grimoire=0", utf8, utf8 + non_utf8);
-                    }
-                    enabled
-                }
-            } else {
-                false
-            };
+            let grimoire_metadata = should_use_grimoire(&mut state, &$options, &mutator_status)?;
+            let grimoire = grimoire_metadata.should();
 
             let edges_observer = edge_maker();
 
@@ -234,6 +196,7 @@ macro_rules! fuzz_with {
                 )
                 .expect("Failed to create state")
             });
+            state.metadata_mut().insert_boxed(grimoire_metadata);
 
             // Attempt to use tokens from libfuzzer dicts
             if state.metadata().get::<Tokens>().is_none() {

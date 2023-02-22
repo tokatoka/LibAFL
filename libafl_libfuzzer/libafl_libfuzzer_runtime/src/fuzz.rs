@@ -1,5 +1,8 @@
 use core::ffi::c_int;
-use std::net::TcpListener;
+use std::{
+    net::TcpListener,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use libafl::{
     bolts::{
@@ -11,7 +14,7 @@ use libafl::{
     events::{EventConfig, ProgressReporter, SimpleEventManager, SimpleRestartingEventManager},
     executors::ExitKind,
     inputs::UsesInput,
-    monitors::{tui::TuiMonitor, SimpleMonitor},
+    monitors::{tui::TuiMonitor, MultiMonitor, SimpleMonitor},
     stages::StagesTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasSolutions, UsesState},
     Error, Fuzzer,
@@ -70,7 +73,10 @@ pub fn fuzz(
         let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
         if forks == 1 {
             fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
-                let monitor = SimpleMonitor::new(|s| eprintln!("{s}"));
+                let monitor = MultiMonitor::with_time(
+                    |s| eprintln!("{s}"),
+                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
+                );
                 let (state, mgr): (
                     Option<StdState<_, _, _, _>>,
                     SimpleRestartingEventManager<_, StdState<_, _, _, _>, _>,
