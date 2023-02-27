@@ -163,7 +163,7 @@ macro_rules! fuzz_with {
                 OOMFeedback,
                 feedback_and_fast!(
                     CrashFeedback::new(),
-                    feedback_or_fast!(ConstFeedback::new($options.dedup()), NewHashFeedback::new(&backtrace_observer))
+                    feedback_or_fast!(ConstFeedback::new(!$options.dedup()), NewHashFeedback::new(&backtrace_observer))
                 ),
                 TimeoutFeedback::new()
             );
