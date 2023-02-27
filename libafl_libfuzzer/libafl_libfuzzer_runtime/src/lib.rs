@@ -15,6 +15,18 @@ mod misc;
 mod options;
 mod report;
 
+mod harness_wrap {
+    #![allow(non_snake_case)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_upper_case_globals)]
+    #![allow(unused)]
+    #![allow(improper_ctypes)]
+    #![allow(clippy::unreadable_literal)]
+    #![allow(missing_docs)]
+    include!(concat!(env!("OUT_DIR"), "/harness_wrap.rs"));
+}
+
+pub(crate) use harness_wrap::libafl_libfuzzer_test_one_input;
 use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -314,10 +326,14 @@ macro_rules! fuzz_with {
                 let target = input.target_bytes();
                 let buf = target.as_slice();
 
-                let result = $harness(buf.as_ptr(), buf.len());
-                *keep.borrow_mut() = result == 0;
-
-                ExitKind::Ok
+                let result = unsafe { crate::libafl_libfuzzer_test_one_input(Some(*$harness), buf.as_ptr(), buf.len()) };
+                match result {
+                    -2 => ExitKind::Crash,
+                    _ => {
+                        *keep.borrow_mut() = result == 0;
+                        ExitKind::Ok
+                    }
+                }
             };
 
             let mut tracing_harness = harness;
