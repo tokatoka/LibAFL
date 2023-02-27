@@ -10,6 +10,7 @@ use crate::options::{LibfuzzerMode, LibfuzzerOptions};
 
 mod feedbacks;
 mod fuzz;
+#[cfg(feature = "merge")]
 mod merge;
 mod misc;
 mod options;
@@ -508,6 +509,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
     }
     let res = match options.mode() {
         LibfuzzerMode::Fuzz => fuzz::fuzz(options, harness),
+        #[cfg(feature = "merge")]
         LibfuzzerMode::Merge => merge::merge(options, harness),
         LibfuzzerMode::Tmin => unimplemented!(),
         LibfuzzerMode::Report => report::report(options, harness),
