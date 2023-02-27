@@ -1,7 +1,13 @@
 use core::ffi::c_int;
 use std::{
+    fs::File,
     net::TcpListener,
     time::{SystemTime, UNIX_EPOCH},
+};
+#[cfg(unix)]
+use std::{
+    io::Write,
+    os::fd::{AsRawFd, FromRawFd},
 };
 
 use libafl::{
@@ -73,8 +79,18 @@ pub fn fuzz(
         let mut shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
         if forks == 1 {
             fuzz_with!(options, harness, do_fuzz, |fuzz_single| {
+                #[cfg(unix)]
+                let mut stderr = unsafe {
+                    let new_fd = libc::dup(std::io::stderr().as_raw_fd().into());
+                    File::from_raw_fd(new_fd.into())
+                };
                 let monitor = MultiMonitor::with_time(
-                    |s| eprintln!("{s}"),
+                    move |s| {
+                        #[cfg(unix)]
+                        writeln!(stderr, "{s}").expect("Could not write to stderr???");
+                        #[cfg(not(unix))]
+                        eprintln!("{s}");
+                    },
                     SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
                 );
                 let (state, mgr): (
@@ -92,6 +108,14 @@ pub fn fuzz(
                         }
                     },
                 };
+                #[cfg(unix)]
+                {
+                    let file_null = File::open("/dev/null")?;
+                    unsafe {
+                        libc::dup2(file_null.as_raw_fd().into(), 1);
+                        libc::dup2(file_null.as_raw_fd().into(), 2);
+                    }
+                }
                 crate::start_fuzzing_single(fuzz_single, state, mgr)
             })
         } else {
