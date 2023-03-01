@@ -89,8 +89,8 @@ macro_rules! fuzz_with {
                 powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
             },
             stages::{
-                CalibrationStage, GeneralizationStage, SkippableStage, StdMutationalStage,
-                StdPowerMutationalStage, TracingStage,
+                CalibrationStage, GeneralizationStage, MapEqualityFactory, SkippableStage, StdMutationalStage,
+                StdPowerMutationalStage, StdTMinMutationalStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -134,13 +134,13 @@ macro_rules! fuzz_with {
             // New maximization map feedback linked to the edges observer
             let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
-            // let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
+            let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
             let generalization = SkippableStage::new(generalization, |_| grimoire.into());
 
-            let calibration1 = CalibrationStage::new(&map_feedback);
+            let calibration = CalibrationStage::new(&map_feedback);
             // let calibration2 = CalibrationStage::new(&map_feedback);
 
             // Feedback to rate the interestingness of an input
@@ -384,12 +384,13 @@ macro_rules! fuzz_with {
             }
 
             // we don't support shrink as of now... it would require duplicating the mutators above
-            // let minimizer = StdScheduledMutator::new(havoc_mutations());
-            // let tmin = StdTMinMutationalStage::new(
-            //     minimizer,
-            //     map_eq_factory,
-            //     1 << 5
-            // );
+            let minimizer = StdScheduledMutator::new(havoc_mutations());
+            let tmin = StdTMinMutationalStage::new(
+                minimizer,
+                map_eq_factory,
+                1 << 8
+            );
+            let tmin = SkippableStage::new(tmin, |_| mutator_status.std_mutational.into());
 
             // Setup a tracing stage in which we log comparisons
             let tracing = TracingStage::new(InProcessExecutor::new(
@@ -402,9 +403,8 @@ macro_rules! fuzz_with {
 
             // The order of the stages matter!
             let mut stages = tuple_list!(
-                calibration1,
-                // tmin,
-                // calibration2,
+                tmin,
+                calibration,
                 generalization,
                 tracing,
                 i2s,
