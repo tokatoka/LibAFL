@@ -86,11 +86,11 @@ macro_rules! fuzz_with {
             },
             observers::{BacktraceObserver, TimeObserver},
             schedulers::{
-                powersched::PowerSchedule, PowerQueueScheduler,
+                IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, PowerQueueScheduler,
             },
             stages::{
-                CalibrationStage, GeneralizationStage, MapEqualityFactory, SkippableStage, StdMutationalStage,
-                StdPowerMutationalStage, StdTMinMutationalStage, TracingStage,
+                CalibrationStage, GeneralizationStage, SkippableStage, StdMutationalStage,
+                StdPowerMutationalStage, TracingStage,
             },
             state::{HasCorpus, StdState},
             StdFuzzer,
@@ -134,7 +134,7 @@ macro_rules! fuzz_with {
             // New maximization map feedback linked to the edges observer
             let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
-            let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
+            // let map_eq_factory = MapEqualityFactory::new_from_observer(&edges_observer);
 
             // Set up a generalization stage for grimoire
             let generalization = GeneralizationStage::new(&edges_observer);
@@ -248,7 +248,7 @@ macro_rules! fuzz_with {
                 5,
             )?;
 
-            let std_power = StdPowerMutationalStage::new(std_mutator, &edges_observer);
+            let std_power = StdPowerMutationalStage::new(std_mutator);
             let std_power = SkippableStage::new(std_power, |_| mutator_status.std_mutational.into());
 
             // for custom mutator and crossover, each have access to the LLVMFuzzerMutate -- but it appears
@@ -274,7 +274,7 @@ macro_rules! fuzz_with {
             };
             let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), 3);
 
-            let cm_power = StdPowerMutationalStage::new(custom_mutator, &edges_observer);
+            let cm_power = StdPowerMutationalStage::new(custom_mutator);
             let cm_power = SkippableStage::new(cm_power, |_| mutator_status.custom_mutation.into());
             let cm_std_power = StdMutationalStage::new(std_mutator_no_mutate);
             let cm_std_power =
@@ -298,7 +298,7 @@ macro_rules! fuzz_with {
 
             let cc_power = StdMutationalStage::new(custom_crossover);
             let cc_power = SkippableStage::new(cc_power, |_| mutator_status.custom_crossover.into());
-            let cc_std_power = StdPowerMutationalStage::new(std_mutator_no_crossover, &edges_observer);
+            let cc_std_power = StdPowerMutationalStage::new(std_mutator_no_crossover);
             let cc_std_power =
                 SkippableStage::new(cc_std_power, |_| mutator_status.std_no_crossover.into());
 
@@ -316,7 +316,7 @@ macro_rules! fuzz_with {
             let grimoire = SkippableStage::new(StdMutationalStage::transforming(grimoire_mutator), |_| grimoire.into());
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler = PowerQueueScheduler::new(&mut state, PowerSchedule::FAST);
+            let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::FAST));
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -383,13 +383,13 @@ macro_rules! fuzz_with {
             }
 
             // we don't support shrink as of now... it would require duplicating the mutators above
-            let minimizer = StdScheduledMutator::new(havoc_mutations());
-            let tmin = StdTMinMutationalStage::new(
-                minimizer,
-                map_eq_factory,
-                1 << 8
-            );
-            let tmin = SkippableStage::new(tmin, |_| mutator_status.std_mutational.into());
+            // let minimizer = StdScheduledMutator::new(havoc_mutations());
+            // let tmin = StdTMinMutationalStage::new(
+            //     minimizer,
+            //     map_eq_factory,
+            //     1 << 8
+            // );
+            // let tmin = SkippableStage::new(tmin, |_| mutator_status.std_mutational.into());
 
             // Setup a tracing stage in which we log comparisons
             let tracing = TracingStage::new(InProcessExecutor::new(
@@ -402,7 +402,7 @@ macro_rules! fuzz_with {
 
             // The order of the stages matter!
             let mut stages = tuple_list!(
-                tmin,
+                // tmin,
                 calibration,
                 generalization,
                 tracing,
