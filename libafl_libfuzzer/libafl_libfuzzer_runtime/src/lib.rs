@@ -86,7 +86,7 @@ macro_rules! fuzz_with {
             },
             observers::{BacktraceObserver, TimeObserver},
             schedulers::{
-                powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+                powersched::PowerSchedule, PowerQueueScheduler,
             },
             stages::{
                 CalibrationStage, GeneralizationStage, MapEqualityFactory, SkippableStage, StdMutationalStage,
@@ -316,8 +316,7 @@ macro_rules! fuzz_with {
             let grimoire = SkippableStage::new(StdMutationalStage::transforming(grimoire_mutator), |_| grimoire.into());
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler =
-                IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(&mut state, PowerSchedule::FAST));
+            let scheduler = PowerQueueScheduler::new(&mut state, PowerSchedule::FAST);
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
