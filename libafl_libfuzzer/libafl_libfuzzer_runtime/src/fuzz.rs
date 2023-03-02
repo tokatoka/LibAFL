@@ -110,10 +110,16 @@ pub fn fuzz(
                 };
                 #[cfg(unix)]
                 {
-                    let file_null = File::open("/dev/null")?;
-                    unsafe {
-                        libc::dup2(file_null.as_raw_fd().into(), 1);
-                        libc::dup2(file_null.as_raw_fd().into(), 2);
+                    if options.close_fd_mask() != 0 {
+                        let file_null = File::open("/dev/null")?;
+                        unsafe {
+                            if options.close_fd_mask() & 1 != 0 {
+                                libc::dup2(file_null.as_raw_fd().into(), 1);
+                            }
+                            if options.close_fd_mask() & 2 != 0 {
+                                libc::dup2(file_null.as_raw_fd().into(), 2);
+                            }
+                        }
                     }
                 }
                 crate::start_fuzzing_single(fuzz_single, state, mgr)
@@ -121,7 +127,10 @@ pub fn fuzz(
         } else {
             fuzz_with!(options, harness, do_fuzz, |mut run_client| {
                 let cores = Cores::from((0..forks).collect::<Vec<_>>());
-                let broker_port = TcpListener::bind("0.0.0.0:0")?.local_addr().unwrap().port();
+                let broker_port = TcpListener::bind("127.0.0.1:0")?
+                    .local_addr()
+                    .unwrap()
+                    .port();
 
                 let monitor = TuiMonitor::new(options.fuzzer_name().to_string(), true);
 

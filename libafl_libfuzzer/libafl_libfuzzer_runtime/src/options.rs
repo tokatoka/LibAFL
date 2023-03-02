@@ -107,6 +107,7 @@ pub struct LibfuzzerOptions {
     malloc_limit: usize,
     dedup: bool,
     tui: bool,
+    close_fd_mask: u8,
     unknown: Vec<String>,
 }
 
@@ -188,6 +189,10 @@ impl LibfuzzerOptions {
         self.tui
     }
 
+    pub fn close_fd_mask(&self) -> u8 {
+        self.close_fd_mask
+    }
+
     pub fn unknown(&self) -> &[String] {
         &self.unknown
     }
@@ -210,6 +215,7 @@ struct LibfuzzerOptionsBuilder<'a> {
     ignore_remaining: bool,
     dedup: bool,
     tui: bool,
+    close_fd_mask: u8,
     unknown: Vec<&'a str>,
 }
 
@@ -289,6 +295,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
                         }
                         "dedup" => self.dedup = parse_or_bail!(name, value, u64) > 0,
                         "tui" => self.tui = parse_or_bail!(name, value, u64) > 0,
+                        "close_fd_mask" => self.close_fd_mask = parse_or_bail!(name, value, u8),
                         _ => {
                             eprintln!("warning: unrecognised flag {name}");
                             self.unknown.push(arg)
@@ -327,6 +334,7 @@ impl<'a> LibfuzzerOptionsBuilder<'a> {
             },
             dedup: self.dedup,
             tui: self.tui,
+            close_fd_mask: self.close_fd_mask,
             unknown: self.unknown.into_iter().map(|s| s.to_string()).collect(),
         })
     }

@@ -125,13 +125,15 @@ void __sanitizer_weak_hook_memcmp(void *called_pc, const void *s1,
     k = (k >> 4) ^ (k << 8);
     k &= CMPLOG_MAP_W - 1;
 
-    __libafl_targets_cmplog_routines_len(k, s1, s2, n);
+    __libafl_targets_cmplog_routines_len(k, s1, s2, MIN(n, 32));
   }
 }
 
 void __sanitizer_weak_hook_strncmp(void *called_pc, const char *s1,
                                    const char *s2, size_t n, int result) {
   if (result != 0) {
+    n = MIN(n, 32);
+
     uintptr_t k = (uintptr_t)called_pc;
     k = (k >> 4) ^ (k << 8);
     k &= CMPLOG_MAP_W - 1;
@@ -158,7 +160,7 @@ void __sanitizer_weak_hook_strcmp(void *called_pc, const char *s1,
     k &= CMPLOG_MAP_W - 1;
 
     size_t actual_len;
-    for (actual_len = 0;; actual_len++) {
+    for (actual_len = 0; actual_len < 32; actual_len++) {
       if (s1[actual_len] == 0 || s2[actual_len] == 0) { break; }
     }
 
