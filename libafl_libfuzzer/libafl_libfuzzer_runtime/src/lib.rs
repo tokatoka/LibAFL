@@ -82,7 +82,7 @@ macro_rules! fuzz_with {
             mutators::{
                 GrimoireExtensionMutator, GrimoireRecursiveReplacementMutator, GrimoireRandomDeleteMutator,
                 GrimoireStringReplacementMutator, havoc_crossover, havoc_mutations, havoc_mutations_no_crossover,
-                I2SRandReplace, StdMOptMutator, StdScheduledMutator, Tokens, tokens_mutations
+                I2SRandReplace, StdScheduledMutator, Tokens, tokens_mutations
             },
             observers::{BacktraceObserver, TimeObserver},
             schedulers::{
@@ -239,14 +239,8 @@ macro_rules! fuzz_with {
             });
             let cm_i2s = SkippableStage::new(cm_i2s, |_| mutator_status.custom_mutation.into());
 
-            // Setup a MOPT mutator
             // TODO configure with mutation stacking options from libfuzzer
-            let std_mutator = StdMOptMutator::new(
-                &mut state,
-                havoc_mutations().merge(tokens_mutations()),
-                7,
-                5,
-            )?;
+            let std_mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
             let std_power = StdPowerMutationalStage::new(std_mutator);
             let std_power = SkippableStage::new(std_power, |_| mutator_status.std_mutational.into());
@@ -265,12 +259,7 @@ macro_rules! fuzz_with {
             // we opt not to use crossover in the LLVMFuzzerMutate and instead have a second crossover pass,
             // though it is likely an error for fuzzers to provide custom mutators but not custom crossovers
             let custom_mutator = unsafe {
-                LLVMCustomMutator::mutate_unchecked(StdMOptMutator::new(
-                    &mut state,
-                    havoc_mutations_no_crossover().merge(tokens_mutations()),
-                    7,
-                    5,
-                )?)
+                LLVMCustomMutator::mutate_unchecked(StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations())))
             };
             let std_mutator_no_mutate = StdScheduledMutator::with_max_stack_pow(havoc_crossover(), 3);
 
@@ -289,12 +278,7 @@ macro_rules! fuzz_with {
                     3,
                 ))
             };
-            let std_mutator_no_crossover = StdMOptMutator::new(
-                &mut state,
-                havoc_mutations_no_crossover().merge(tokens_mutations()),
-                7,
-                5,
-            )?;
+            let std_mutator_no_crossover = StdScheduledMutator::new(havoc_mutations_no_crossover().merge(tokens_mutations()));
 
             let cc_power = StdMutationalStage::new(custom_crossover);
             let cc_power = SkippableStage::new(cc_power, |_| mutator_status.custom_crossover.into());
