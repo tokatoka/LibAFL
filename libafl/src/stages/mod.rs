@@ -27,6 +27,9 @@ pub use power::{PowerMutationalStage, StdPowerMutationalStage};
 pub mod generalization;
 pub use generalization::GeneralizationStage;
 
+pub mod loop_mutational;
+pub use loop_mutational::LoopMutationalStage;
+
 pub mod owned;
 pub use owned::StagesOwnedList;
 
