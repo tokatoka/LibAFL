@@ -1073,6 +1073,7 @@ where
 
         let size = input.bytes().len();
         if size == 0 {
+            println!("size is 0");
             return Ok(MutationResult::Skipped);
         }
 
@@ -1080,11 +1081,13 @@ where
             let cmp_meta = state.metadata_map().get::<AFLppCmpValuesMetadata>();
             let taint_meta = state.metadata_map().get::<TaintMetadata>();
             if cmp_meta.is_none() || taint_meta.is_none() {
+                println!("meta is none");
                 return Ok(MutationResult::Skipped);
             }
 
             let cmp_len = cmp_meta.unwrap().headers().len();
             if cmp_len == 0 {
+                println!("cmp header len 0");
                 return Ok(MutationResult::Skipped);
             }
             (cmp_len, cmp_meta.unwrap(), taint_meta.unwrap())
@@ -1524,7 +1527,7 @@ where
                 }
             }
         }
-
+        println!("cmplog end");
         Ok(MutationResult::Skipped)
     }
 }

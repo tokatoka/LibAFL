@@ -26,16 +26,15 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::AFLppRedQueen, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        StdMOptMutator, Tokens,
     },
-    observers::{AFLppCmpMap, HitcountsMapObserver, AFLppCmpObserver, StdMapObserver, TimeObserver},
+    observers::{AFLppCmpMap, HitcountsMapObserver, AFLppStdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        tracing::AFLppCmplogTracingStage, ColorizationStage
-        TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, AFLppCmpLogStage,
+        tracing::AFLppCmplogTracingStage, ColorizationStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -363,14 +362,14 @@ fn fuzz(
             TimeoutForkserverExecutor::with_signal(cmplog_forkserver, timeout * 10, signal)
                 .expect("Failed to create the executor.");
 
-        let tracing2 = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
+        let tracing = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
 
         // Setup a randomic Input2State stage
-        let i2s =
-            StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+        let rq =
+            AFLppCmpLogStage::new(AFLppRedQueen::with_cmplog_options(true, true));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, tracing, i2s, power);
+        let mut stages = tuple_list!(calibration, colorization, tracing, rq, power);
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
     } else {
