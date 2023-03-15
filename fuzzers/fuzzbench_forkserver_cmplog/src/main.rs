@@ -33,6 +33,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
+        Stage,
+        ClosureStage,
         calibrate::CalibrationStage, power::StdPowerMutationalStage, AFLppCmpLogStage,
         tracing::AFLppCmplogTracingStage, ColorizationStage,
     },
@@ -365,11 +367,17 @@ fn fuzz(
         let tracing = AFLppCmplogTracingStage::with_cmplog_observer_name(cmplog_executor, "cmplog");
 
         // Setup a randomic Input2State stage
-        let rq =
+        let mut rq =
             AFLppCmpLogStage::new(AFLppRedQueen::with_cmplog_options(true, true));
 
+        let cb = |fuzzer, executor, stage, event_manager, corpus_id| -> Result<(), libafl::Error> {
+            rq.perform(fuzzer, executor, stage, event_manager, corpus_id)
+        };
+    
+        let closure = ClosureStage::new(cb);
+
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, colorization, tracing, rq, power);
+        let mut stages = tuple_list!(calibration, colorization, tracing, closure, power);
 
         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
     } else {
