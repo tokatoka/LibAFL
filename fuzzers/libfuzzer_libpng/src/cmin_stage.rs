@@ -2,18 +2,20 @@ use core::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use libafl::{
     bolts::AsIter,
-    corpus::minimizer::{CorpusMinimizer, MapCorpusMinimizer},
-    corpus::CorpusId,
+    corpus::{
+        minimizer::{CorpusMinimizer, MapCorpusMinimizer},
+        CorpusId,
+    },
     executors::{Executor, HasObservers},
     observers::MapObserver,
-    schedulers::{Scheduler, TestcaseScore},
+    schedulers::{RemovableScheduler, TestcaseScore},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand, UsesState},
+    state::{HasCorpus, HasMetadata, UsesState},
     Error, HasScheduler,
 };
 
-#[derive(Clone, Debug)]
-pub struct CMinStage<EM, Z, E, O, T, TS>
+#[derive(Debug)]
+pub struct CMinStage<E, EM, O, T, TS, Z>
 where
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
@@ -27,22 +29,19 @@ where
     phantom: PhantomData<(EM, Z, E, O, T, TS)>,
 }
 
-impl<EM, Z, E, O, T, TS> UsesState for CMinStage<EM, Z, E, O, T, TS>
+impl<E, EM, O, T, TS, Z> UsesState for CMinStage<E, EM, O, T, TS, Z>
 where
-    EM: UsesState,
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
     T: Copy + Hash + Eq,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
 {
-    type State = EM::State;
+    type State = E::State;
 }
 
-impl<EM, Z, E, O, T, TS> CMinStage<EM, Z, E, O, T, TS>
+impl<E, EM, O, T, TS, Z> CMinStage<E, EM, O, T, TS, Z>
 where
-    EM: UsesState<State = Z::State>,
-    Z: UsesState,
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
@@ -58,14 +57,14 @@ where
     }
 }
 
-impl<EM, EX, Z, E, O, T, TS> Stage<EX, EM, Z> for CMinStage<EM, Z, E, O, T, TS>
+impl<E, EM, O, T, TS, Z> Stage<E, EM, Z> for CMinStage<E, EM, O, T, TS, Z>
 where
-    EM: UsesState<State = Z::State>,
-    EX: UsesState<State = Z::State>,
-    EX::State: HasCorpus + HasMetadata + HasExecutions,
-    Z: UsesState,
     E: UsesState,
     E::State: HasCorpus + HasMetadata,
+    E: Executor<EM, Z> + HasObservers,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State> + HasScheduler,
+    Z::Scheduler: RemovableScheduler,
     TS: TestcaseScore<E::State>,
     T: Copy + Hash + Eq,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
@@ -74,12 +73,12 @@ where
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        executor: &mut EX,
-        state: &mut EX::State,
+        executor: &mut E,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: CorpusId,
     ) -> Result<(), Error> {
-        //self.minimizer.minimize(fuzzer, executor, manager, state)?;
+        self.minimizer.minimize(fuzzer, executor, manager, state)?;
 
         Ok(())
     }
