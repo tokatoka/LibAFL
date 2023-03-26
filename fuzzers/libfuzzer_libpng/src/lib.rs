@@ -9,6 +9,8 @@ use core::time::Duration;
 use std::ptr;
 use std::{env, path::PathBuf};
 
+mod cmin_stage;
+
 use libafl::{
     bolts::{
         current_nanos,
@@ -16,7 +18,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, StdCorpusMinimizer},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
@@ -144,7 +146,11 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let power = StdPowerMutationalStage::new(mutator);
 
-    let mut stages = tuple_list!(calibration, power);
+    let minimizer = StdCorpusMinimizer::new(&edges_observer);
+
+    let cmin_stage = cmin_stage::CMinStage::new(minimizer)?;
+
+    let mut stages = tuple_list!(calibration, power, cmin_stage);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
