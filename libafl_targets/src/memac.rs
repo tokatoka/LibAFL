@@ -1,45 +1,48 @@
 use libafl::{
     executors::{hooks::ExecutorHook, HasObservers},
-    inputs::HasBytesVec,
+    inputs::{HasBytesVec, UsesInput},
 };
 
 use core::marker::PhantomData;
 /// The hook to log the pointer the input buffer
-pub struct MemacHook<I> {
-    phantom: PhantomData<I>
+#[derive(Debug)]
+pub struct MemacHook<S> 
+where
+    S: UsesInput,
+{
+    phantom: PhantomData<S>
 }
 
 extern "C" {
     /// where we log the pointer to the input buffer.
-    pub static mut __data_pointer: *mut u8;
+    pub static mut __input_start: *mut u8;
+    /// where we log the pointer to the end of the input buffer.
+    pub static mut __input_end: *mut u8;
 }
 
-impl<I> ExecutorHook for MemacHook<I> 
+impl<S> ExecutorHook<S> for MemacHook<S>
 where
-    I: HasBytesVec,
+    S: UsesInput,
+    S::Input: HasBytesVec,
 {
-    fn init<E, S>(&mut self, _: &mut S)
+    fn init<E: HasObservers>(&mut self, _: &mut S)
     where
         E: HasObservers,
     {
         unsafe {
-            __data_pointer = core::ptr::null_mut();
+            __input_start = core::ptr::null_mut();
         }
     }
 
-    fn pre_exec<EM, I, S, Z>(&mut self, _: &mut Z, _: &mut S, _: &mut EM, input: &I) 
+    fn pre_exec(&mut self, _: &mut S, input: &S::Input) 
     where
     {
-        self.remember_ptr(input);
+        let ptr = input.bytes().as_ptr() as u64 as *mut u8;
+        let len = input.bytes().len();
+        unsafe {
+            __input_start = ptr;
+            __input_end = ptr.add(len);
+        }
     }
-    fn post_exec<EM, I, S, Z>(&mut self, _: &mut Z, _: &mut S, _: &mut EM, _: &I) {}
-}
-
-impl<I> MemacHook<I> 
-where
-    I: HasBytesVec,
-{
-    fn remember_ptr(&self, input: &I)
-    {
-    }
+    fn post_exec(&mut self, _: &mut S, _: &S::Input) {}
 }
