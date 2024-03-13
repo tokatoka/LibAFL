@@ -12,6 +12,15 @@ use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
 
+/// The size for memory access map
+pub const MEM_MAP_SIZE: usize = 65536;
+/// The map for remembering the memory access pattern
+#[cfg(feature = "mem")]
+#[no_mangle]
+pub static mut __mem_ac_ptr_local: [u8; MEM_MAP_SIZE * 2] = [0; MEM_MAP_SIZE * 2];
+#[cfg(feature = "mem")]
+pub use __mem_ac_ptr_local as MEM_MAP;
+
 /// The map for accounting mem writes.
 #[no_mangle]
 pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];

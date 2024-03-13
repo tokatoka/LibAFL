@@ -28,7 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver, StdMapObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -45,12 +45,13 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
+    ownedref::OwnedMutSlice,
     AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, MEM_MAP
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -244,6 +245,11 @@ fn fuzz(
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
+    
+    // let mem_ac_observer = unsafe { StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from_raw_parts_mut(MEM_MAP.as_mut_ptr(), MEM_MAP_SIZE)) };
+    
+    let mem_ac_observer = unsafe { StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from(MEM_MAP.as_mut_slice())) };
+    
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
@@ -251,6 +257,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
+    let mem_ac_feedback = MaxMapFeedback::tracking(&mem_ac_observer, false, false);
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
@@ -258,6 +265,7 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
+        mem_ac_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
     );
@@ -329,7 +337,7 @@ fn fuzz(
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::with_timeout(
         &mut harness,
-        tuple_list!(edges_observer, time_observer),
+        tuple_list!(edges_observer, time_observer, mem_ac_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -383,9 +391,9 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
+        // dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
+            // dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end
