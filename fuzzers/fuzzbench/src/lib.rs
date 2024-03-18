@@ -258,7 +258,8 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
-    let mem_ac_feedback = MaxMapFeedback::tracking(&mem_ac_observer, false, false);
+    let mut mem_ac_feedback = MaxMapFeedback::tracking(&mem_ac_observer, false, false);
+    mem_ac_feedback.set_never_corpus();
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
@@ -392,7 +393,7 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
             // dup2(null_fd, io::stderr().as_raw_fd())?;
         }

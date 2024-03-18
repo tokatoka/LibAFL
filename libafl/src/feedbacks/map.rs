@@ -827,6 +827,9 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
+        if self.name == "mem ac" {
+            eprintln!("mem ac");
+        }
         let history_map = map_state.history_map.as_mut_slice();
 
         let initial = observer.initial();
