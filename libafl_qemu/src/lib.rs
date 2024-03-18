@@ -1,5 +1,7 @@
+#![cfg_attr(nightly, feature(used_with_arg))]
 //! Welcome to `LibAFL` QEMU
 //!
+//! __Warning__: The documentation is built by default for `x86_64` in `usermode`. To access the documentation of other architectures or `systemmode`, the documentation must be rebuilt with the right features.
 #![doc = include_str!("../../README.md")]
 /*! */
 #![cfg_attr(feature = "document-features", doc = document_features::document_features!())]
@@ -81,9 +83,9 @@ pub mod cmplog;
 #[cfg(not(any(cpu_target = "mips", cpu_target = "hexagon")))]
 pub use cmplog::QemuCmpLogHelper;
 
-#[cfg(feature = "injections")]
+#[cfg(all(emulation_mode = "usermode", feature = "injections"))]
 pub mod injections;
-#[cfg(feature = "injections")]
+#[cfg(all(emulation_mode = "usermode", feature = "injections"))]
 pub use injections::QemuInjectionHelper;
 
 #[cfg(all(emulation_mode = "usermode", not(cpu_target = "hexagon")))]

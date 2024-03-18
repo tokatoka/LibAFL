@@ -8,12 +8,11 @@ use std::{env, fs::DirEntry, io, path::PathBuf, process};
 use clap::{builder::Str, Parser};
 use libafl::{
     corpus::{Corpus, NopCorpus},
-    events::{launcher::Launcher, EventConfig, EventRestarter},
-    executors::{ExitKind, TimeoutExecutor},
+    events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
+    executors::ExitKind,
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    prelude::LlmpRestartingEventManager,
     schedulers::QueueScheduler,
     state::{HasCorpus, StdState},
     Error,
@@ -34,6 +33,11 @@ use rangemap::RangeMap;
 
 #[derive(Default)]
 pub struct Version;
+
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
 
 impl From<Version> for Str {
     fn from(_: Version) -> Str {
@@ -73,8 +77,8 @@ pub struct FuzzerOptions {
     #[arg(long, help = "Input directory")]
     input: String,
 
-    #[arg(long, help = "Timeout in seconds", default_value_t = 1_u64)]
-    timeout: u64,
+    #[arg(long, help = "Timeout in seconds", default_value = "5000", value_parser = timeout_from_millis_str)]
+    timeout: Duration,
 
     #[arg(long = "port", help = "Broker port", default_value_t = 1337_u16)]
     port: u16,
@@ -176,102 +180,102 @@ pub fn fuzz() {
         ExitKind::Ok
     };
 
-    let mut run_client = |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _>, core_id| {
-        let core_idx = options
-            .cores
-            .position(core_id)
-            .expect("Failed to get core index");
-        let files = corpus_files
-            .iter()
-            .skip(files_per_core * core_idx)
-            .take(files_per_core)
-            .map(|x| x.path())
-            .collect::<Vec<PathBuf>>();
+    let mut run_client =
+        |state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _>, core_id| {
+            let core_idx = options
+                .cores
+                .position(core_id)
+                .expect("Failed to get core index");
+            let files = corpus_files
+                .iter()
+                .skip(files_per_core * core_idx)
+                .take(files_per_core)
+                .map(|x| x.path())
+                .collect::<Vec<PathBuf>>();
 
-        if files.is_empty() {
-            mgr.send_exiting()?;
-            Err(Error::ShuttingDown)?
-        }
+            if files.is_empty() {
+                mgr.send_exiting()?;
+                Err(Error::ShuttingDown)?
+            }
 
-        #[allow(clippy::let_unit_value)]
-        let mut feedback = ();
+            #[allow(clippy::let_unit_value)]
+            let mut feedback = ();
 
-        #[allow(clippy::let_unit_value)]
-        let mut objective = ();
+            #[allow(clippy::let_unit_value)]
+            let mut objective = ();
 
-        let mut state = state.unwrap_or_else(|| {
-            StdState::new(
-                StdRand::with_seed(current_nanos()),
-                NopCorpus::new(),
-                NopCorpus::new(),
-                &mut feedback,
-                &mut objective,
-            )
-            .unwrap()
-        });
+            let mut state = state.unwrap_or_else(|| {
+                StdState::new(
+                    StdRand::with_seed(current_nanos()),
+                    NopCorpus::new(),
+                    NopCorpus::new(),
+                    &mut feedback,
+                    &mut objective,
+                )
+                .unwrap()
+            });
 
-        let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+            let scheduler = QueueScheduler::new();
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let rangemap = emu
-            .mappings()
-            .filter_map(|m| {
-                m.path()
-                    .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
-                    .filter(|(_, p)| !p.is_empty())
-            })
-            .enumerate()
-            .fold(
-                RangeMap::<usize, (u16, String)>::new(),
-                |mut rm, (i, (r, p))| {
-                    rm.insert(r, (i as u16, p));
-                    rm
-                },
+            let rangemap = emu
+                .mappings()
+                .filter_map(|m| {
+                    m.path()
+                        .map(|p| ((m.start() as usize)..(m.end() as usize), p.to_string()))
+                        .filter(|(_, p)| !p.is_empty())
+                })
+                .enumerate()
+                .fold(
+                    RangeMap::<usize, (u16, String)>::new(),
+                    |mut rm, (i, (r, p))| {
+                        rm.insert(r, (i as u16, p));
+                        rm
+                    },
+                );
+
+            let mut coverage = PathBuf::from(&options.coverage);
+            let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
+            let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
+            let core = core_id.0;
+            coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+
+            let mut hooks = QemuHooks::new(
+                emu.clone(),
+                tuple_list!(QemuDrCovHelper::new(
+                    QemuInstrumentationAddressRangeFilter::None,
+                    rangemap,
+                    PathBuf::from(coverage),
+                    false,
+                )),
             );
 
-        let mut coverage = PathBuf::from(&options.coverage);
-        let coverage_name = coverage.file_stem().unwrap().to_str().unwrap();
-        let coverage_extension = coverage.extension().unwrap_or_default().to_str().unwrap();
-        let core = core_id.0;
-        coverage.set_file_name(format!("{coverage_name}-{core:03}.{coverage_extension}"));
+            let mut executor = QemuExecutor::new(
+                &mut hooks,
+                &mut harness,
+                (),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+                options.timeout,
+            )
+            .expect("Failed to create QemuExecutor");
 
-        let mut hooks = QemuHooks::new(
-            emu.clone(),
-            tuple_list!(QemuDrCovHelper::new(
-                QemuInstrumentationAddressRangeFilter::None,
-                rangemap,
-                PathBuf::from(coverage),
-                false,
-            )),
-        );
+            if state.must_load_initial_inputs() {
+                state
+                    .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
+                    .unwrap_or_else(|_| {
+                        println!("Failed to load initial corpus at {:?}", &corpus_dir);
+                        process::exit(0);
+                    });
+                log::debug!("We imported {} inputs from disk.", state.corpus().count());
+            }
 
-        let executor = QemuExecutor::new(
-            &mut hooks,
-            &mut harness,
-            (),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )
-        .expect("Failed to create QemuExecutor");
+            log::debug!("Processed {} inputs from disk.", files.len());
 
-        let mut executor = TimeoutExecutor::new(executor, Duration::from_secs(options.timeout));
-
-        if state.must_load_initial_inputs() {
-            state
-                .load_initial_inputs_by_filenames(&mut fuzzer, &mut executor, &mut mgr, &files)
-                .unwrap_or_else(|_| {
-                    println!("Failed to load initial corpus at {:?}", &corpus_dir);
-                    process::exit(0);
-                });
-            log::debug!("We imported {} inputs from disk.", state.corpus().count());
-        }
-
-        log::debug!("Processed {} inputs from disk.", files.len());
-
-        mgr.send_exiting()?;
-        Err(Error::ShuttingDown)?
-    };
+            mgr.send_exiting()?;
+            Err(Error::ShuttingDown)?
+        };
 
     match Launcher::builder()
         .shmem_provider(StdShMemProvider::new().expect("Failed to init shared memory"))

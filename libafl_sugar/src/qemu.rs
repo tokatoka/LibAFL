@@ -9,7 +9,7 @@ use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
 use libafl::{
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{launcher::Launcher, EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -63,7 +63,7 @@ where
     /// Dictionary
     #[builder(default = None)]
     tokens_file: Option<PathBuf>,
-    /// Flag if use CmpLog
+    /// Flag if use `CmpLog`
     #[builder(default = None)]
     use_cmplog: Option<bool>,
     /// The port the fuzzing nodes communicate over
@@ -146,7 +146,7 @@ where
         let monitor = MultiMonitor::new(|s| log::info!("{s}"));
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
@@ -231,8 +231,8 @@ where
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
+                    timeout,
                 )?;
-                let executor = TimeoutExecutor::new(executor, timeout);
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
                 // In case the corpus is empty (on first run), reset
@@ -330,15 +330,15 @@ where
                     tuple_list!(QemuEdgeCoverageHelper::default()),
                 );
 
-                let executor = QemuExecutor::new(
+                let mut executor = QemuExecutor::new(
                     &mut hooks,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,
                     &mut mgr,
+                    timeout,
                 )?;
-                let mut executor = TimeoutExecutor::new(executor, timeout);
 
                 // In case the corpus is empty (on first run), reset
                 if state.must_load_initial_inputs() {

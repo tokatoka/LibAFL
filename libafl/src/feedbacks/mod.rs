@@ -23,6 +23,8 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+pub mod transferred;
+
 use alloc::string::{String, ToString};
 use core::{
     fmt::{self, Debug, Formatter},
@@ -107,14 +109,16 @@ where
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
     #[allow(unused_variables)]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         Ok(())
     }
@@ -243,17 +247,21 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
-        self.first.append_metadata(state, observers, testcase)?;
-        self.second.append_metadata(state, observers, testcase)
+        self.first
+            .append_metadata(state, manager, observers, testcase)?;
+        self.second
+            .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
@@ -657,16 +665,19 @@ where
     }
 
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         state: &mut S,
+        manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
-        self.first.append_metadata(state, observers, testcase)
+        self.first
+            .append_metadata(state, manager, observers, testcase)
     }
 
     #[inline]
@@ -913,14 +924,16 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata<OT>(
+    fn append_metadata<EM, OT>(
         &mut self,
         _state: &mut S,
+        _manager: &mut EM,
         observers: &OT,
         testcase: &mut Testcase<S::Input>,
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<S>,
+        EM: EventFirer<State = S>,
     {
         let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
         *testcase.exec_time_mut() = *observer.last_runtime();
@@ -1094,9 +1107,10 @@ impl From<bool> for ConstFeedback {
 
 /// `Feedback` Python bindings
 #[cfg(feature = "python")]
-#[allow(clippy::unnecessary_fallible_conversions)]
+#[allow(clippy::unnecessary_fallible_conversions, unused_qualifications)]
 #[allow(missing_docs)]
 pub mod pybind {
+    use core::ptr;
     use std::cell::UnsafeCell;
 
     use libafl_bolts::Named;
@@ -1187,9 +1201,9 @@ pub mod pybind {
             // # Safety
             // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
-                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
+                unsafe { &*(ptr::from_ref(observers) as *const PythonObserversTuple) };
             let dont_look_at_this2: &PythonEventManager =
-                unsafe { &*(manager as *mut EM as *const PythonEventManager) };
+                unsafe { &*(ptr::from_mut(manager) as *const PythonEventManager) };
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
                     .inner
@@ -1209,9 +1223,10 @@ pub mod pybind {
             })?)
         }
 
-        fn append_metadata<OT>(
+        fn append_metadata<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
+            _manager: &mut EM,
             observers: &OT,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
@@ -1221,7 +1236,7 @@ pub mod pybind {
             // # Safety
             // We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
-                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
+                unsafe { &*(ptr::from_ref(observers) as *const PythonObserversTuple) };
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
@@ -1652,17 +1667,19 @@ pub mod pybind {
             })
         }
 
-        fn append_metadata<OT>(
+        fn append_metadata<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
+            manager: &mut EM,
             observers: &OT,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error>
         where
             OT: ObserversTuple<PythonStdState>,
+            EM: EventFirer<State = PythonStdState>,
         {
             unwrap_me_mut!(self.wrapper, f, {
-                f.append_metadata(state, observers, testcase)
+                f.append_metadata(state, manager, observers, testcase)
             })
         }
 

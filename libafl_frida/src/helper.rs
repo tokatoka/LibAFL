@@ -30,7 +30,7 @@ use yaxpeax_x86::amd64::InstDecoder;
 
 #[cfg(unix)]
 use crate::asan::asan_rt::AsanRuntime;
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+#[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
@@ -510,7 +510,7 @@ where
                     if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                         rt.emit_shadow_check(
                             address,
-                            &output,
+                            output,
                             basereg,
                             indexreg,
                             displacement,
@@ -520,7 +520,10 @@ where
                     }
                 }
 
-                #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+                #[cfg(all(
+                    feature = "cmplog",
+                    any(target_arch = "aarch64", target_arch = "x86_64")
+                ))]
                 if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>() {
                     if let Some((op1, op2, shift, special_case)) =
                         CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
@@ -529,11 +532,11 @@ where
                         //emit code that saves the relevant data in runtime(passes it to x0, x1)
                         rt.emit_comparison_handling(
                             address,
-                            &output,
+                            output,
                             &op1,
                             &op2,
-                            shift,
-                            special_case,
+                            &shift,
+                            &special_case,
                         );
                     }
                 }
@@ -584,23 +587,25 @@ where
     // workaround frida's frida-gum-allocate-near bug:
     #[cfg(unix)]
     fn workaround_gum_allocate_near() {
+        use std::fs::File;
+
         unsafe {
             for _ in 0..512 {
-                mmap(
+                mmap::<File>(
                     None,
                     std::num::NonZeroUsize::new_unchecked(128 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    -1,
+                    None,
                     0,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
-                mmap(
+                mmap::<File>(
                     None,
                     std::num::NonZeroUsize::new_unchecked(4 * 1024 * 1024),
                     ProtFlags::PROT_NONE,
                     ANONYMOUS_FLAG | MapFlags::MAP_PRIVATE | MapFlags::MAP_NORESERVE,
-                    -1,
+                    None,
                     0,
                 )
                 .expect("Failed to map dummy regions for frida workaround");
