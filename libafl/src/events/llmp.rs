@@ -303,10 +303,15 @@ where
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
-            Event::Objective { objective_size } => {
+            Event::Objective {
+                objective_size,
+                executions,
+                time,
+            } => {
                 monitor.client_stats_insert(client_id);
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
+                client.update_executions(*executions, *time);
                 monitor.display(event.name(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -610,10 +615,7 @@ where
         for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
-        if self
-            .hooks
-            .pre_exec_all(fuzzer, executor, state, client_id, &event)?
-        {
+        if self.hooks.pre_exec_all(state, client_id, &event)? {
             return Ok(());
         }
         match event {
@@ -672,8 +674,7 @@ where
                 )));
             }
         }
-        self.hooks
-            .post_exec_all(fuzzer, executor, state, client_id)?;
+        self.hooks.post_exec_all(state, client_id)?;
         Ok(())
     }
 }
