@@ -18,7 +18,7 @@ use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::HookableInProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -51,7 +51,8 @@ use libafl_bolts::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, MEM_MAP,
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
+    CtxHook, MemacHook, NgramHook, CTX_MAP, MEM_MAP, NGRAM_MAP,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -251,6 +252,14 @@ fn fuzz(
         StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from(MEM_MAP.as_mut_slice()))
     };
 
+    let ngram_observer = unsafe {
+        StdMapObserver::from_mut_slice("ngram", OwnedMutSlice::from(NGRAM_MAP.as_mut_slice()))
+    };
+
+    let ctx_observer = unsafe {
+        StdMapObserver::from_mut_slice("ctx", OwnedMutSlice::from(CTX_MAP.as_mut_slice()))
+    };
+
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
@@ -260,14 +269,23 @@ fn fuzz(
 
     let mut mem_ac_feedback = MaxMapFeedback::tracking(&mem_ac_observer, false, false);
     mem_ac_feedback.set_never_corpus();
-    let calibration = CalibrationStage::new(&map_feedback);
+    let mut ngram_feedback = MaxMapFeedback::tracking(&ngram_observer, false, false);
+    ngram_feedback.set_never_corpus();
+    let mut ctx_feedback = MaxMapFeedback::tracking(&ctx_observer, false, false);
+    ctx_feedback.set_never_corpus();
 
+    let calibration = CalibrationStage::new(&map_feedback);
+    let memac_hook = MemacHook::new();
+    let ngram_hook = NgramHook::new();
+    let ctx_hook = CtxHook::new();
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
         mem_ac_feedback,
+        ngram_feedback,
+        ctx_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
     );
@@ -337,9 +355,16 @@ fn fuzz(
     let mut tracing_harness = harness;
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let mut executor = InProcessExecutor::with_timeout(
+    let mut executor = HookableInProcessExecutor::with_timeout_generic(
+        tuple_list!(memac_hook, ngram_hook, ctx_hook),
         &mut harness,
-        tuple_list!(edges_observer, time_observer, mem_ac_observer),
+        tuple_list!(
+            edges_observer,
+            time_observer,
+            mem_ac_observer,
+            ngram_observer,
+            ctx_observer
+        ),
         &mut fuzzer,
         &mut state,
         &mut mgr,
@@ -348,7 +373,8 @@ fn fuzz(
 
     // Setup a tracing stage in which we log comparisons
     let tracing = TracingStage::new(
-        InProcessExecutor::with_timeout(
+        HookableInProcessExecutor::with_timeout_generic(
+            tuple_list!(),
             &mut tracing_harness,
             tuple_list!(cmplog_observer),
             &mut fuzzer,

@@ -26,12 +26,16 @@ pub static mut __mem_ac_ptr_local: [u8; MEM_MAP_SIZE * 2] = [0; MEM_MAP_SIZE * 2
 #[cfg(feature = "mem")]
 pub use __mem_ac_ptr_local as MEM_MAP;
 
+/// The map for remembering ngram
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+#[no_mangle]
 pub static mut __ngram_ptr_local: [u8; NGRAM_MAP_SIZE] = [0; NGRAM_MAP_SIZE];
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 pub use __ngram_ptr_local as NGRAM_MAP;
 
+/// The map for remembering ctx
 #[cfg(feature = "sancov_ctx")]
+#[no_mangle]
 pub static mut __ctx_ptr_local: [u8; CTX_MAP_SIZE] = [0; CTX_MAP_SIZE];
 #[cfg(feature = "sancov_ctx")]
 pub use __ctx_ptr_local as CTX_MAP;

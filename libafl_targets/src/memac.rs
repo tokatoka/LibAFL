@@ -44,3 +44,16 @@ where
     }
     fn post_exec(&mut self, _: &mut S, _: &S::Input) {}
 }
+
+impl<S> MemacHook<S>
+where
+    S: UsesInput,
+    S::Input: HasBytesVec,
+{
+    /// Constructor for this hook
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}

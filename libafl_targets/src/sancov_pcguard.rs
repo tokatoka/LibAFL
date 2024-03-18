@@ -226,7 +226,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 
     #[cfg(feature = "sancov_ctx")]
     {
-        let ctx = __afl_prev_ctx ^ ctx as usize;
+        let ctx = __afl_prev_ctx as usize ^ pos;
         let val = (*CTX_MAP.get_unchecked(ctx)).wrapping_add(1);
         *CTX_MAP.get_unchecked_mut(ctx) = val;
         // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);

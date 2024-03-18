@@ -10,9 +10,10 @@ use core::{
     fmt::Debug,
     marker::PhantomData,
     ops::{BitAnd, BitOr},
+    time::Duration,
 };
 
-use libafl_bolts::{AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
+use libafl_bolts::{current_time, AsIter, AsMutSlice, AsSlice, HasRefCnt, Named};
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -27,6 +28,8 @@ use crate::{
     state::{HasMetadata, HasNamedMetadata, State},
     Error,
 };
+
+const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_secs(30);
 
 /// The prefix of the metadata names
 pub const MAPFEEDBACK_PREFIX: &str = "mapfeedback_metadata_";
@@ -380,6 +383,8 @@ where
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
 pub struct MapFeedback<N, O, R, S, T> {
+    /// when did we report progress last?
+    last_progress: Option<Duration>,
     /// Just update the metadata but don't mark this as interesting
     never_corpus: bool,
     /// Indexes used in the last observation
@@ -432,7 +437,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
+        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind)?)
     }
 
     #[rustversion::not(nightly)]
@@ -448,7 +453,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind))
+        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind)?)
     }
 
     fn append_metadata<EM, OT>(
@@ -563,7 +568,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
-        _manager: &mut EM,
+        manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
@@ -664,7 +669,7 @@ where
             }
         }
 
-        if self.never_corpus {
+        if interesting && self.never_corpus {
             interesting = false;
             let initial = observer.initial();
             // if never_corpus is set that means we want to do metadata update early.
@@ -680,6 +685,24 @@ where
                     map_state.num_covered_map_indexes += 1;
                 }
                 history_map[i] = MaxReducer::reduce(history_map[i], value);
+            }
+        }
+
+        if self.never_corpus {
+            if self.update_progress() {
+                let len = history_map.len();
+                let covered = map_state.num_covered_map_indexes;
+                manager.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: self.name.to_string(),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(covered as u64, len as u64),
+                            AggregatorOps::Avg,
+                        ),
+                        phantom: PhantomData,
+                    },
+                )?;
             }
         }
 
@@ -727,6 +750,7 @@ where
     pub fn new(map_observer: &O) -> Self {
         Self {
             never_corpus: false,
+            last_progress: None,
             indexes: false,
             novelties: None,
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
@@ -741,6 +765,7 @@ where
     pub fn tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
         Self {
             never_corpus: false,
+            last_progress: None,
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
@@ -755,6 +780,7 @@ where
     pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
         Self {
             never_corpus: false,
+            last_progress: None,
             indexes: false,
             novelties: None,
             name: name.to_string(),
@@ -771,6 +797,7 @@ where
     pub fn with_name(name: &'static str, map_observer: &O) -> Self {
         Self {
             never_corpus: false,
+            last_progress: None,
             indexes: false,
             novelties: None,
             name: name.to_string(),
@@ -790,6 +817,7 @@ where
     ) -> Self {
         Self {
             never_corpus: false,
+            last_progress: None,
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
             observer_name: observer_name.to_string(),
@@ -805,11 +833,11 @@ where
     fn is_interesting_default<EM, OT>(
         &mut self,
         state: &mut S,
-        _manager: &mut EM,
+        manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
-    ) -> bool
+    ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
@@ -827,9 +855,6 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        if self.name == "mem ac" {
-            eprintln!("mem ac");
-        }
         let history_map = map_state.history_map.as_mut_slice();
 
         let initial = observer.initial();
@@ -865,7 +890,7 @@ where
             }
         }
 
-        if self.never_corpus {
+        if interesting && self.never_corpus {
             interesting = false;
             let initial = observer.initial();
             // if never_corpus is set that means we want to do metadata update early.
@@ -884,12 +909,46 @@ where
             }
         }
 
-        interesting
+        if self.never_corpus {
+            if self.update_progress() {
+                let len = history_map.len();
+                let covered = map_state.num_covered_map_indexes;
+                manager.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: self.name.to_string(),
+                        value: UserStats::new(
+                            UserStatsValue::Ratio(covered as u64, len as u64),
+                            AggregatorOps::Avg,
+                        ),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
+        }
+
+        Ok(interesting)
     }
 
     /// Set `never_corpus`
     pub fn set_never_corpus(&mut self) {
         self.never_corpus = true;
+    }
+
+    fn update_progress(&mut self) -> bool {
+        let Some(last_time) = self.last_progress else {
+            // This is our first time, just return false
+            self.last_progress = Some(current_time());
+            return false;
+        };
+        let cur = current_time();
+        if cur.checked_sub(last_time).unwrap_or_default() > PROGRESS_UPDATE_INTERVAL {
+            // report_progress sets a new `last_report_time` internally.
+            self.last_progress = Some(current_time());
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 
