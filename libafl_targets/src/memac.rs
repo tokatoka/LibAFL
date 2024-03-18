@@ -1,16 +1,16 @@
+use core::marker::PhantomData;
+
 use libafl::{
     executors::{hooks::ExecutorHook, HasObservers},
     inputs::{HasBytesVec, UsesInput},
 };
-
-use core::marker::PhantomData;
 /// The hook to log the pointer the input buffer
 #[derive(Debug)]
-pub struct MemacHook<S> 
+pub struct MemacHook<S>
 where
     S: UsesInput,
 {
-    phantom: PhantomData<S>
+    phantom: PhantomData<S>,
 }
 
 extern "C" {
@@ -34,9 +34,7 @@ where
         }
     }
 
-    fn pre_exec(&mut self, _: &mut S, input: &S::Input) 
-    where
-    {
+    fn pre_exec(&mut self, _: &mut S, input: &S::Input) {
         let ptr = input.bytes().as_ptr() as u64 as *mut u8;
         let len = input.bytes().len();
         unsafe {

@@ -7,6 +7,8 @@ use core::simd::num::SimdUint;
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ctx"))]
 use libafl::executors::{hooks::ExecutorHook, HasObservers};
 
+#[cfg(feature = "sancov_ctx")]
+use crate::coverage::CTX_MAP;
 #[cfg(any(
     feature = "pointer_maps",
     feature = "sancov_pcguard_edges",
@@ -14,6 +16,8 @@ use libafl::executors::{hooks::ExecutorHook, HasObservers};
 ))]
 use crate::coverage::EDGES_MAP;
 use crate::coverage::MAX_EDGES_NUM;
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+use crate::coverage::NGRAM_MAP;
 #[cfg(feature = "pointer_maps")]
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 #[cfg(feature = "sancov_ngram4")]
@@ -214,13 +218,17 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 
     #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
     {
-        pos = update_ngram(pos);
+        let ngram = update_ngram(pos);
+        let val = (*NGRAM_MAP.get_unchecked(ngram)).wrapping_add(1);
+        *NGRAM_MAP.get_unchecked_mut(ngram) = val;
         // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
     }
 
     #[cfg(feature = "sancov_ctx")]
     {
-        pos ^= __afl_prev_ctx as usize;
+        let ctx = __afl_prev_ctx ^ ctx as usize;
+        let val = (*CTX_MAP.get_unchecked(ctx)).wrapping_add(1);
+        *CTX_MAP.get_unchecked_mut(ctx) = val;
         // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
     }
 

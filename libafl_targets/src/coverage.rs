@@ -14,12 +14,27 @@ pub use __afl_area_ptr_local as EDGES_MAP;
 
 /// The size for memory access map
 pub const MEM_MAP_SIZE: usize = 65536;
+/// The size for ngram coverage map
+pub const NGRAM_MAP_SIZE: usize = 65536;
+/// The size for ctx coverage map
+pub const CTX_MAP_SIZE: usize = 65536;
+
 /// The map for remembering the memory access pattern
 #[cfg(feature = "mem")]
 #[no_mangle]
 pub static mut __mem_ac_ptr_local: [u8; MEM_MAP_SIZE * 2] = [0; MEM_MAP_SIZE * 2];
 #[cfg(feature = "mem")]
 pub use __mem_ac_ptr_local as MEM_MAP;
+
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+pub static mut __ngram_ptr_local: [u8; NGRAM_MAP_SIZE] = [0; NGRAM_MAP_SIZE];
+#[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
+pub use __ngram_ptr_local as NGRAM_MAP;
+
+#[cfg(feature = "sancov_ctx")]
+pub static mut __ctx_ptr_local: [u8; CTX_MAP_SIZE] = [0; CTX_MAP_SIZE];
+#[cfg(feature = "sancov_ctx")]
+pub use __ctx_ptr_local as CTX_MAP;
 
 /// The map for accounting mem writes.
 #[no_mangle]

@@ -28,7 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, StdMapObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -42,16 +42,16 @@ use libafl::{
 use libafl_bolts::{
     current_nanos, current_time,
     os::dup2,
+    ownedref::OwnedMutSlice,
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    ownedref::OwnedMutSlice,
     AsSlice,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, MEM_MAP
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver, MEM_MAP,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -245,11 +245,12 @@ fn fuzz(
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
-    
     // let mem_ac_observer = unsafe { StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from_raw_parts_mut(MEM_MAP.as_mut_ptr(), MEM_MAP_SIZE)) };
-    
-    let mem_ac_observer = unsafe { StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from(MEM_MAP.as_mut_slice())) };
-    
+
+    let mem_ac_observer = unsafe {
+        StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from(MEM_MAP.as_mut_slice()))
+    };
+
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 

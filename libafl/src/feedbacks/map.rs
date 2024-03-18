@@ -380,6 +380,8 @@ where
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
 pub struct MapFeedback<N, O, R, S, T> {
+    /// Just update the metadata but don't mark this as interesting
+    never_corpus: bool,
     /// Indexes used in the last observation
     indexes: bool,
     /// New indexes observed in the last observation
@@ -460,6 +462,13 @@ where
         OT: ObserversTuple<S>,
         EM: EventFirer<State = S>,
     {
+        if self.never_corpus {
+            // Early return here.
+            // since we are not interested in putting this guy into the corpus.
+            // we'll update the map's metadata in is_interesting.
+            return Ok(());
+        }
+
         if let Some(novelties) = self.novelties.as_mut().map(core::mem::take) {
             let meta = MapNoveltiesMetadata::new(novelties);
             testcase.add_metadata(meta);
@@ -583,7 +592,7 @@ where
         let map = observer.as_slice();
         debug_assert!(map.len() >= size);
 
-        let history_map = map_state.history_map.as_slice();
+        let history_map = map_state.history_map.as_mut_slice();
 
         // Non vector implementation for reference
         /*for (i, history) in history_map.iter_mut().enumerate() {
@@ -655,6 +664,25 @@ where
             }
         }
 
+        if self.never_corpus {
+            interesting = false;
+            let initial = observer.initial();
+            // if never_corpus is set that means we want to do metadata update early.
+            // also append_metada will do nothing so we'll update our stuff in is_interesting already.
+
+            for (i, value) in observer
+                .as_iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, value)| *value != initial)
+            {
+                if history_map[i] == initial {
+                    map_state.num_covered_map_indexes += 1;
+                }
+                history_map[i] = MaxReducer::reduce(history_map[i], value);
+            }
+        }
+
         Ok(interesting)
     }
 }
@@ -698,6 +726,7 @@ where
     #[must_use]
     pub fn new(map_observer: &O) -> Self {
         Self {
+            never_corpus: false,
             indexes: false,
             novelties: None,
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
@@ -711,6 +740,7 @@ where
     #[must_use]
     pub fn tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
         Self {
+            never_corpus: false,
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
@@ -724,6 +754,7 @@ where
     #[must_use]
     pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
         Self {
+            never_corpus: false,
             indexes: false,
             novelties: None,
             name: name.to_string(),
@@ -739,6 +770,7 @@ where
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &O) -> Self {
         Self {
+            never_corpus: false,
             indexes: false,
             novelties: None,
             name: name.to_string(),
@@ -757,6 +789,7 @@ where
         track_novelties: bool,
     ) -> Self {
         Self {
+            never_corpus: false,
             indexes: track_indexes,
             novelties: if track_novelties { Some(vec![]) } else { None },
             observer_name: observer_name.to_string(),
@@ -794,7 +827,7 @@ where
             map_state.history_map.resize(len, observer.initial());
         }
 
-        let history_map = map_state.history_map.as_slice();
+        let history_map = map_state.history_map.as_mut_slice();
 
         let initial = observer.initial();
 
@@ -829,7 +862,31 @@ where
             }
         }
 
+        if self.never_corpus {
+            interesting = false;
+            let initial = observer.initial();
+            // if never_corpus is set that means we want to do metadata update early.
+            // also append_metada will do nothing so we'll update our stuff in is_interesting already.
+
+            for (i, value) in observer
+                .as_iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, value)| *value != initial)
+            {
+                if history_map[i] == initial {
+                    map_state.num_covered_map_indexes += 1;
+                }
+                history_map[i] = R::reduce(history_map[i], value);
+            }
+        }
+
         interesting
+    }
+
+    /// Set `never_corpus`
+    pub fn set_never_corpus(&mut self) {
+        self.never_corpus = true;
     }
 }
 
