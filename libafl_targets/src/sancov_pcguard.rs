@@ -23,6 +23,8 @@ use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 #[cfg(feature = "sancov_ngram4")]
 use crate::EDGES_MAP_SIZE;
 
+use alloc::vec::Vec;
+
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
 compile_error!(
@@ -67,6 +69,7 @@ pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 ))]
 use core::marker::PhantomData;
 
+/// The hook for path observer
 #[cfg(feature = "sancov_path")]
 #[derive(Debug, Clone, Copy)]
 pub struct PathHook<S> {
@@ -79,6 +82,7 @@ where
     S: libafl::inputs::UsesInput,
 {
     #[must_use]
+    /// Constructor
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -87,15 +91,19 @@ where
 }
 
 
-#[cfg(feature = "sancov_ctx")]
+#[cfg(feature = "sancov_path")]
 impl<S> ExecutorHook<S> for PathHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {
+        unsafe {
+            PATH_VEC.resize(1, 0);
+        }
+    }
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         unsafe {
-            __afl_prev_path = 0;
+            PATH_VEC[0] = 0;
         }
     }
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
@@ -238,10 +246,12 @@ unsafe fn update_ngram(pos: usize) -> usize {
 extern "C" {
     /// The ctx variable
     pub static mut __afl_prev_ctx: u32;
-    /// The Path variable
-    pub static mut __afl_prev_path: u32;
 }
 
+/// where you accumulate paths
+#[no_mangle]
+pub static mut __afl_prev_path: Vec<usize> = Vec::new();
+pub use __afl_prev_path as PATH_VEC;
 /// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
 ///
 /// # Safety
@@ -271,9 +281,9 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
 
     #[cfg(feature = "sancov_path")]
     {
+        let pth = PATH_VEC[0];
         let pth = (pth << 1) ^ pos;
-        let val = (*PATH_MAP.get_unchecked(pth)).wrapping_add(1);
-        *PATH_MAP.get_unchecked_mut(pth) = val;
+        PATH_VEC[0] = pth;
     }
 
     #[cfg(feature = "pointer_maps")]

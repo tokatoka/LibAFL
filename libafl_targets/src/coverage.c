@@ -34,5 +34,4 @@ uint8_t *__token_stop = &__stop_libafl_token;
 
 // #if defined(__ANDROID__) || defined(__HAIKU__)
 uint32_t                      __afl_prev_ctx;
-uint32_t                      __afl_prev_path;
 MAYBE_THREAD_LOCAL prev_loc_t __afl_acc_prev_loc;

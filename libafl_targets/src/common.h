@@ -2,7 +2,7 @@
 #define __LIBAFL_TARGETS_COMMON__
 
 #include <stdint.h>
-
+#include <stddef.h>
 #define true 1
 #define false 0
 

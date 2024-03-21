@@ -28,7 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, ListObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -52,10 +52,10 @@ use libafl_bolts::{
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
-    CtxHook, MemacHook, NgramHook, CTX_MAP, MEM_MAP, NGRAM_MAP,
+    CtxHook, MemacHook, NgramHook, CTX_MAP, MEM_MAP, NGRAM_MAP, PATH_VEC, PathHook
 };
 #[cfg(unix)]
-use nix::{self, unistd::dup};
+use nix::unistd::dup;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -263,6 +263,10 @@ fn fuzz(
         StdMapObserver::from_mut_slice("ctx", OwnedMutSlice::from(CTX_MAP.as_mut_slice()))
     };
 
+    let list_observer = unsafe {
+        ListObserver::new("path", core::ptr::addr_of_mut!(PATH_VEC))
+    };
+
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
@@ -276,6 +280,7 @@ fn fuzz(
     ngram_feedback.set_never_corpus();
     let mut ctx_feedback = MaxMapFeedback::tracking(&ctx_observer, false, false);
     ctx_feedback.set_never_corpus();
+    let list_feedback = ListFeedback
 
     let calibration = CalibrationStage::new(&map_feedback);
     let memac_hook = MemacHook::new();
