@@ -67,6 +67,41 @@ pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 ))]
 use core::marker::PhantomData;
 
+#[cfg(feature = "sancov_path")]
+#[derive(Debug, Clone, Copy)]
+pub struct PathHook<S> {
+    phantom: PhantomData<S>,
+}
+
+#[cfg(feature = "sancov_path")]
+impl<S> PathHook<S> 
+where
+    S: libafl::inputs::UsesInput,
+{
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+
+#[cfg(feature = "sancov_ctx")]
+impl<S> ExecutorHook<S> for PathHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
+        unsafe {
+            __afl_prev_path = 0;
+        }
+    }
+    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
+}
+
+
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
@@ -203,6 +238,8 @@ unsafe fn update_ngram(pos: usize) -> usize {
 extern "C" {
     /// The ctx variable
     pub static mut __afl_prev_ctx: u32;
+    /// The Path variable
+    pub static mut __afl_prev_path: u32;
 }
 
 /// Callback for sancov `pc_guard` - usually called by `llvm` on each block or edge.
@@ -230,6 +267,13 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
         let val = (*CTX_MAP.get_unchecked(ctx)).wrapping_add(1);
         *CTX_MAP.get_unchecked_mut(ctx) = val;
         // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
+    }
+
+    #[cfg(feature = "sancov_path")]
+    {
+        let pth = (pth << 1) ^ pos;
+        let val = (*PATH_MAP.get_unchecked(pth)).wrapping_add(1);
+        *PATH_MAP.get_unchecked_mut(pth) = val;
     }
 
     #[cfg(feature = "pointer_maps")]

@@ -18,12 +18,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   if (memcmp(Data, buf, 4) == 0) { 
 	  printf("Hellow\n");
   }
-
+  char *ptr = malloc(8);
   if (Size < 8) {
     return 0;
   }
   if (Data[0] == 'j') {
+      char uninitialized = ptr[3];
       printf("1st");
+      printf("%c\n", uninitialized);
       f(Data);
   }
   return 0;
