@@ -29,7 +29,7 @@ use crate::{
     Error,
 };
 
-const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_secs(30);
+pub const PROGRESS_UPDATE_INTERVAL: Duration = Duration::from_secs(30);
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
 pub type AflMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, OrReducer, S, T>;
@@ -434,7 +434,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind)?)
+        self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
     #[rustversion::not(nightly)]
@@ -450,7 +450,7 @@ where
         EM: EventFirer<State = S>,
         OT: ObserversTuple<S>,
     {
-        Ok(self.is_interesting_default(state, manager, input, observers, exit_kind)?)
+        self.is_interesting_default(state, manager, input, observers, exit_kind)?
     }
 
     fn append_metadata<EM, OT>(
@@ -685,22 +685,20 @@ where
             }
         }
 
-        if self.never_corpus {
-            if self.update_progress() {
-                let len = history_map.len();
-                let covered = map_state.num_covered_map_indexes;
-                manager.fire(
-                    state,
-                    Event::UpdateUserStats {
-                        name: self.name.to_string(),
-                        value: UserStats::new(
-                            UserStatsValue::Ratio(covered as u64, len as u64),
-                            AggregatorOps::Avg,
-                        ),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
+        if self.never_corpus && self.update_progress() {
+            let len = history_map.len();
+            let covered = map_state.num_covered_map_indexes;
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.name.to_string(),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(covered as u64, len as u64),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
         }
 
         Ok(interesting)
@@ -906,22 +904,20 @@ where
             }
         }
 
-        if self.never_corpus {
-            if self.update_progress() {
-                let len = history_map.len();
-                let covered = map_state.num_covered_map_indexes;
-                manager.fire(
-                    state,
-                    Event::UpdateUserStats {
-                        name: self.name.to_string(),
-                        value: UserStats::new(
-                            UserStatsValue::Ratio(covered as u64, len as u64),
-                            AggregatorOps::Avg,
-                        ),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
+        if self.never_corpus && self.update_progress() {
+            let len = history_map.len();
+            let covered = map_state.num_covered_map_indexes;
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.name.to_string(),
+                    value: UserStats::new(
+                        UserStatsValue::Ratio(covered as u64, len as u64),
+                        AggregatorOps::Avg,
+                    ),
+                    phantom: PhantomData,
+                },
+            )?;
         }
 
         Ok(interesting)
@@ -942,9 +938,9 @@ where
         if cur.checked_sub(last_time).unwrap_or_default() > PROGRESS_UPDATE_INTERVAL {
             // report_progress sets a new `last_report_time` internally.
             self.last_progress = Some(current_time());
-            return true;
+            true
         } else {
-            return false;
+            false
         }
     }
 }

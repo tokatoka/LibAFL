@@ -1,14 +1,15 @@
 use alloc::string::{String, ToString};
-use core::{fmt::Debug, hash::Hash, marker::PhantomData};
+use core::{fmt::Debug, hash::Hash, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
-use libafl_bolts::{Error, HasRefCnt, Named};
+use libafl_bolts::{current_time, Error, HasRefCnt, Named};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    events::EventFirer,
+    events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{map::PROGRESS_UPDATE_INTERVAL, Feedback},
+    monitors::{AggregatorOps, UserStats, UserStatsValue},
     observers::{ListObserver, ObserversTuple},
     state::{HasNamedMetadata, State},
 };
@@ -28,6 +29,8 @@ where
     pub set: HashSet<T>,
     /// A refcount used to know when we can remove this metadata
     pub tcref: isize,
+    /// count how many we have
+    pub counter: usize,
 }
 
 impl<T> ListFeedbackMetadata<T>
@@ -40,6 +43,7 @@ where
         Self {
             set: HashSet::<T>::new(),
             tcref: 0,
+            counter: 0,
         }
     }
 
@@ -72,6 +76,8 @@ where
     name: String,
     observer_name: String,
     novelty: HashSet<T>,
+    never_corpus: bool,
+    last_progress: Option<Duration>,
     phantom: PhantomData<T>,
 }
 
@@ -94,7 +100,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
-        _manager: &mut EM,
+        manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
@@ -119,7 +125,31 @@ where
                 self.novelty.insert(*v);
             }
         }
-        Ok(!self.novelty.is_empty())
+        let mut interesting = !self.novelty.is_empty();
+
+        if interesting && self.never_corpus {
+            // just update metadata early
+            for v in &self.novelty {
+                history_set.set.insert(*v);
+                history_set.counter += 1;
+            }
+
+            interesting = false;
+        }
+
+        if self.never_corpus && self.update_progress() {
+            let all_seen = history_set.counter as u64;
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.name.to_string(),
+                    value: UserStats::new(UserStatsValue::Number(all_seen), AggregatorOps::Avg),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
+        Ok(interesting)
     }
 
     fn append_metadata<EM, OT>(
@@ -133,6 +163,10 @@ where
         OT: ObserversTuple<S>,
         EM: EventFirer<State = S>,
     {
+        if self.never_corpus {
+            // early return
+            return Ok(());
+        }
         let history_set = state
             .named_metadata_map_mut()
             .get_mut::<ListFeedbackMetadata<T>>(&self.name)
@@ -140,6 +174,7 @@ where
 
         for v in &self.novelty {
             history_set.set.insert(*v);
+            history_set.counter += 1;
         }
         Ok(())
     }
@@ -166,7 +201,30 @@ where
             name: observer.name().to_string(),
             observer_name: observer.name().to_string(),
             novelty: HashSet::<T>::new(),
+            never_corpus: false,
+            last_progress: None,
             phantom: PhantomData,
+        }
+    }
+
+    /// just never save corpus entry from here
+    pub fn set_never_corpus(&mut self) {
+        self.never_corpus = true;
+    }
+
+    fn update_progress(&mut self) -> bool {
+        let Some(last_time) = self.last_progress else {
+            // This is our first time, just return false
+            self.last_progress = Some(current_time());
+            return false;
+        };
+        let cur = current_time();
+        if cur.checked_sub(last_time).unwrap_or_default() > PROGRESS_UPDATE_INTERVAL {
+            // report_progress sets a new `last_report_time` internally.
+            self.last_progress = Some(current_time());
+            true
+        } else {
+            false
         }
     }
 }

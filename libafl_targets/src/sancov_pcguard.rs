@@ -1,5 +1,6 @@
 //! [`LLVM` `PcGuard`](https://clang.llvm.org/docs/SanitizerCoverage.html#tracing-pcs-with-guards) runtime for `LibAFL`.
 
+use alloc::vec::Vec;
 #[rustversion::nightly]
 #[cfg(feature = "sancov_ngram4")]
 use core::simd::num::SimdUint;
@@ -22,8 +23,6 @@ use crate::coverage::NGRAM_MAP;
 use crate::coverage::{EDGES_MAP_PTR, EDGES_MAP_PTR_NUM};
 #[cfg(feature = "sancov_ngram4")]
 use crate::EDGES_MAP_SIZE;
-
-use alloc::vec::Vec;
 
 #[cfg(all(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts"))]
 #[cfg(not(any(doc, feature = "clippy")))]
@@ -77,7 +76,7 @@ pub struct PathHook<S> {
 }
 
 #[cfg(feature = "sancov_path")]
-impl<S> PathHook<S> 
+impl<S> PathHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
@@ -90,25 +89,28 @@ where
     }
 }
 
+impl <S> Default for PathHook<S>
+where
+    S: libafl::inputs::UsesInput,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(feature = "sancov_path")]
 impl<S> ExecutorHook<S> for PathHook<S>
 where
     S: libafl::inputs::UsesInput,
 {
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {
+    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
         unsafe {
             PATH_VEC.resize(1, 0);
         }
     }
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
-        unsafe {
-            PATH_VEC[0] = 0;
-        }
-    }
     fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
 }
-
 
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]

@@ -13,6 +13,16 @@ where
     phantom: PhantomData<S>,
 }
 
+impl <S> Default for MemacHook<S>
+where
+    S: UsesInput,
+    S::Input: HasBytesVec,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 extern "C" {
     /// where we log the pointer to the input buffer.
     pub static mut __input_start: *mut u8;
@@ -26,8 +36,6 @@ where
     S::Input: HasBytesVec,
 {
     fn init<E: HasObservers>(&mut self, _: &mut S)
-    where
-        E: HasObservers,
     {
         unsafe {
             __input_start = core::ptr::null_mut();
@@ -51,6 +59,7 @@ where
     S::Input: HasBytesVec,
 {
     /// Constructor for this hook
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,

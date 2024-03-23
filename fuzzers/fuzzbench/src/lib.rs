@@ -20,7 +20,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{inprocess::HookableInProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, ListFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -28,7 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver, ListObserver},
+    observers::{HitcountsMapObserver, ListObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -52,7 +52,7 @@ use libafl_bolts::{
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
-    CtxHook, MemacHook, NgramHook, CTX_MAP, MEM_MAP, NGRAM_MAP, PATH_VEC, PathHook
+    CtxHook, MemacHook, NgramHook, PathHook, CMP_MAP, CTX_MAP, MEM_MAP, NGRAM_MAP, PATH_VEC,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -263,9 +263,10 @@ fn fuzz(
         StdMapObserver::from_mut_slice("ctx", OwnedMutSlice::from(CTX_MAP.as_mut_slice()))
     };
 
-    let list_observer = unsafe {
-        ListObserver::new("path", core::ptr::addr_of_mut!(PATH_VEC))
-    };
+    let path_observer = unsafe { ListObserver::new("path", core::ptr::addr_of_mut!(PATH_VEC)) };
+
+    let cmps = unsafe { &mut CMP_MAP };
+    let cmps_observer = unsafe { StdMapObserver::new("cmps", cmps) };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -280,12 +281,16 @@ fn fuzz(
     ngram_feedback.set_never_corpus();
     let mut ctx_feedback = MaxMapFeedback::tracking(&ctx_observer, false, false);
     ctx_feedback.set_never_corpus();
-    let list_feedback = ListFeedback
+    let mut path_feedback = ListFeedback::new(&path_observer);
+    path_feedback.set_never_corpus();
+    let mut cmp_feedback = MaxMapFeedback::tracking(&cmps_observer, false, false);
+    cmp_feedback.set_never_corpus();
 
     let calibration = CalibrationStage::new(&map_feedback);
     let memac_hook = MemacHook::new();
     let ngram_hook = NgramHook::new();
     let ctx_hook = CtxHook::new();
+    let path_hook = PathHook::new();
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
@@ -294,6 +299,8 @@ fn fuzz(
         mem_ac_feedback,
         ngram_feedback,
         ctx_feedback,
+        path_feedback,
+        cmp_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
     );
@@ -364,14 +371,16 @@ fn fuzz(
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = HookableInProcessExecutor::with_timeout_generic(
-        tuple_list!(memac_hook, ngram_hook, ctx_hook),
+        tuple_list!(memac_hook, ngram_hook, ctx_hook, path_hook),
         &mut harness,
         tuple_list!(
             edges_observer,
             time_observer,
             mem_ac_observer,
             ngram_observer,
-            ctx_observer
+            ctx_observer,
+            path_observer,
+            cmps_observer,
         ),
         &mut fuzzer,
         &mut state,
