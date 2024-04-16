@@ -43,6 +43,8 @@ pub enum LLVMPasses {
     Ctx,
     /// Instrument memory access
     Memory,
+    /// Data dependency instrumentation
+    DDG,
 }
 
 impl LLVMPasses {
@@ -66,8 +68,13 @@ impl LLVMPasses {
             LLVMPasses::Ctx => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("ctx-pass.{}", dll_extension()))
             }
+<<<<<<< HEAD
             LLVMPasses::Memory => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("mem-ac-pass.{}", dll_extension()))
+=======
+            LLVMPasses::DDG => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("ddg-instr.{}", dll_extension()))
+>>>>>>> 8bce6055 (DDFuzz (#2056))
             }
         }
     }
