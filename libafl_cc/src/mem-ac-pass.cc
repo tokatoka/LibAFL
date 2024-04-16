@@ -130,7 +130,7 @@ bool CtxPass::runOnModule(Module &M) {
   uint32_t rand_seed;
 
   hookRead = M.getOrInsertFunction("__libafl_hook_read", VoidTy, Int64Ty);
-  hookWrite = M.getOrInsertFunction("__libafl_hook_read", VoidTy, Int64Ty);
+  hookWrite = M.getOrInsertFunction("__libafl_hook_write", VoidTy, Int64Ty);
 
   for (auto &F : M) {
     int has_calls = 0;

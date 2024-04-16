@@ -281,13 +281,6 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
         // println!("Wrinting to {} {}", pos, EDGES_MAP_SIZE);
     }
 
-    #[cfg(feature = "sancov_path")]
-    {
-        let pth = PATH_VEC[0];
-        let pth = (pth << 1) ^ pos;
-        PATH_VEC[0] = pth;
-    }
-
     #[cfg(feature = "pointer_maps")]
     {
         #[cfg(feature = "sancov_pcguard_edges")]

@@ -251,10 +251,6 @@ fn fuzz(
 
     // let mem_ac_observer = unsafe { StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from_raw_parts_mut(MEM_MAP.as_mut_ptr(), MEM_MAP_SIZE)) };
 
-    let mem_ac_observer = unsafe {
-        StdMapObserver::from_mut_slice("mem ac", OwnedMutSlice::from(MEM_MAP.as_mut_slice()))
-    };
-
     let ngram_observer = unsafe {
         StdMapObserver::from_mut_slice("ngram", OwnedMutSlice::from(NGRAM_MAP.as_mut_slice()))
     };
@@ -275,8 +271,6 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
 
-    let mut mem_ac_feedback = MaxMapFeedback::tracking(&mem_ac_observer, false, false);
-    mem_ac_feedback.set_never_corpus();
     let mut ngram_feedback = MaxMapFeedback::tracking(&ngram_observer, false, false);
     ngram_feedback.set_never_corpus();
     let mut ctx_feedback = MaxMapFeedback::tracking(&ctx_observer, false, false);
@@ -296,7 +290,6 @@ fn fuzz(
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
-        mem_ac_feedback,
         ngram_feedback,
         ctx_feedback,
         path_feedback,
@@ -376,7 +369,6 @@ fn fuzz(
         tuple_list!(
             edges_observer,
             time_observer,
-            mem_ac_observer,
             ngram_observer,
             ctx_observer,
             path_observer,
@@ -436,7 +428,7 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
+        // dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
             // dup2(null_fd, io::stderr().as_raw_fd())?;
         }

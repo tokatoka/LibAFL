@@ -6,7 +6,7 @@ extern uint8_t __mem_ac_ptr_local[MEM_MAP_SIZE * 2];
 uint8_t *__input_start;
 uint8_t *__input_end;
 void __libafl_hook_read(uint64_t addr) {
-    if(addr >= (uint64_t)__input_start || addr <= (uint64_t) __input_end) {
+    if(addr >= (uint64_t)__input_start && addr <= (uint64_t) __input_end) {
         return;
     }
     uint64_t pos = addr % MEM_MAP_SIZE;
@@ -14,7 +14,7 @@ void __libafl_hook_read(uint64_t addr) {
 }
 
 void __libafl_hook_write(uint64_t addr) {
-    if(addr >= (uint64_t)__input_start || addr <= (uint64_t) __input_end) {
+    if(addr >= (uint64_t)__input_start && addr <= (uint64_t) __input_end) {
         return;
     }
     uint64_t pos = addr % MEM_MAP_SIZE;
