@@ -35,6 +35,7 @@ pub fn main() {
             .link_staticlib(&dir, "fuzzbench")
             .add_pass(LLVMPasses::CmpLogRtn)
             .add_pass(LLVMPasses::Memory)
+            .add_pass(LLVMPasses::DDG)
             .run()
             .expect("Failed to run the wrapped compiler")
         {

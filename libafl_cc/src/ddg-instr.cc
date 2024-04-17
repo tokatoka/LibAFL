@@ -96,8 +96,8 @@
 #define MIN_FCN_SIZE 1
 #define VAR_NAME_LEN 264
 
-#define MAP_SIZE LIBAFL_EDGES_MAP_SIZE
-// #define MAP_SIZE 65536
+// #define MAP_SIZE LIBAFL_EDGES_MAP_SIZE
+#define MAP_SIZE 65536
 #define ALL_BIT_SET (MAP_SIZE - 1)
 // #define MAP_SIZE 255
 
@@ -756,7 +756,8 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
         StoreInst *StoreMapPtr = IRB.CreateStore(Incr, MapPtrIdx);
         StoreMapPtr->setMetadata(M.getMDKindID("nosanitize"),
                                  MDNode::get(C, None));
-
+        errs() << "Instrumenting" << "\t\n";
+        F.dump();
         instrumentedLocations++;
       }
     }

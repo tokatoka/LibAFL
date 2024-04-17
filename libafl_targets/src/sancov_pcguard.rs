@@ -89,7 +89,7 @@ where
     }
 }
 
-impl <S> Default for PathHook<S>
+impl<S> Default for PathHook<S>
 where
     S: libafl::inputs::UsesInput,
 {

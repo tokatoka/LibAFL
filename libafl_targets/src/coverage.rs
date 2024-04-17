@@ -18,6 +18,8 @@ pub const MEM_MAP_SIZE: usize = 65536;
 pub const NGRAM_MAP_SIZE: usize = 65536;
 /// The size for ctx coverage map
 pub const CTX_MAP_SIZE: usize = 65536;
+/// The size for ddg coverage map
+pub const DDG_MAP_SIZE: usize = 65536;
 
 /// The map for remembering the memory access pattern
 #[cfg(feature = "mem")]
@@ -41,7 +43,7 @@ pub static mut __ctx_ptr_local: [u8; CTX_MAP_SIZE] = [0; CTX_MAP_SIZE];
 pub use __ctx_ptr_local as CTX_MAP;
 /// The map for data dependency
 #[no_mangle]
-pub static mut __ddg_area_ptr_local: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
+pub static mut __ddg_area_ptr_local: [u8; DDG_MAP_SIZE] = [0; DDG_MAP_SIZE];
 pub use __ddg_area_ptr_local as DDG_MAP;
 
 /// The map for accounting mem writes.

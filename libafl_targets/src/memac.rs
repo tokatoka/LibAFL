@@ -13,7 +13,7 @@ where
     phantom: PhantomData<S>,
 }
 
-impl <S> Default for MemacHook<S>
+impl<S> Default for MemacHook<S>
 where
     S: UsesInput,
     S::Input: HasBytesVec,
@@ -35,8 +35,7 @@ where
     S: UsesInput,
     S::Input: HasBytesVec,
 {
-    fn init<E: HasObservers>(&mut self, _: &mut S)
-    {
+    fn init<E: HasObservers>(&mut self, _: &mut S) {
         unsafe {
             __input_start = core::ptr::null_mut();
         }

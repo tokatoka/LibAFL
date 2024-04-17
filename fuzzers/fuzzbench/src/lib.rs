@@ -52,7 +52,7 @@ use libafl_bolts::{
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
-    CtxHook, MemacHook, NgramHook, PathHook, CMP_MAP, CTX_MAP, MEM_MAP, NGRAM_MAP, PATH_VEC,
+    CtxHook, MemacHook, NgramHook, PathHook, CMP_MAP, CTX_MAP, MEM_MAP, NGRAM_MAP, PATH_VEC, DDG_MAP,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -259,10 +259,11 @@ fn fuzz(
         StdMapObserver::from_mut_slice("ctx", OwnedMutSlice::from(CTX_MAP.as_mut_slice()))
     };
 
-    let path_observer = unsafe { ListObserver::new("path", core::ptr::addr_of_mut!(PATH_VEC)) };
-
     let cmps = unsafe { &mut CMP_MAP };
     let cmps_observer = unsafe { StdMapObserver::new("cmps", cmps) };
+
+    let ddgs = unsafe { &mut DDG_MAP };
+    let ddgs_observer = unsafe { StdMapObserver::new("ddgs", ddgs) };
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -270,13 +271,13 @@ fn fuzz(
     let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::tracking(&edges_observer, true, false);
+    let mut ddg_feedback = MaxMapFeedback::tracking(&ddgs_observer, false, false);
+    ddg_feedback.set_never_corpus();
 
     let mut ngram_feedback = MaxMapFeedback::tracking(&ngram_observer, false, false);
     ngram_feedback.set_never_corpus();
     let mut ctx_feedback = MaxMapFeedback::tracking(&ctx_observer, false, false);
     ctx_feedback.set_never_corpus();
-    let mut path_feedback = ListFeedback::new(&path_observer);
-    path_feedback.set_never_corpus();
     let mut cmp_feedback = MaxMapFeedback::tracking(&cmps_observer, false, false);
     cmp_feedback.set_never_corpus();
 
@@ -284,15 +285,14 @@ fn fuzz(
     let memac_hook = MemacHook::new();
     let ngram_hook = NgramHook::new();
     let ctx_hook = CtxHook::new();
-    let path_hook = PathHook::new();
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
         map_feedback,
+        ddg_feedback,
         ngram_feedback,
         ctx_feedback,
-        path_feedback,
         cmp_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::with_observer(&time_observer)
@@ -364,14 +364,14 @@ fn fuzz(
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = HookableInProcessExecutor::with_timeout_generic(
-        tuple_list!(memac_hook, ngram_hook, ctx_hook, path_hook),
+        tuple_list!(memac_hook, ngram_hook, ctx_hook),
         &mut harness,
         tuple_list!(
             edges_observer,
+            ddgs_observer,
             time_observer,
             ngram_observer,
             ctx_observer,
-            path_observer,
             cmps_observer,
         ),
         &mut fuzzer,
