@@ -18,7 +18,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
                 sum += Data[i];
         }
   }
-  fprintf(stderr, "%d\n", sum);
   if (memcmp(Data, buf, 4) == 0) {  }
   return 0;
 }
