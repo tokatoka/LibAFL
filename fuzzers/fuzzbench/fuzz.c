@@ -1,26 +1,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 
 int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
-  if (Size >= 8 && *(uint32_t *)Data == 0xaabbccdd) { }
+  if (Size >= 8 && *(uint32_t *)Data == 0xaabbccdd) { abort(); }
   char buf[8] = {'a', 'b', 'c', 'd'};
-  int sum = 0;
-  for(int i = 0; i < 8; i++) {
-        sum += buf[0];
-        if (i < Size) {
-                sum += Data[i];
-        }
-  }
-  if (memcmp(Data, buf, 4) == 0) {  }
+
+  if (memcmp(Data, buf, 4) == 0) { abort(); }
   return 0;
 }
+
 /*
 int main() {
 
