@@ -52,7 +52,8 @@ use libafl_bolts::{
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
-    CtxHook, MemacHook, NgramHook, PathHook, CMP_MAP, CTX_MAP, MEM_MAP, NGRAM_MAP, PATH_VEC, DDG_MAP,
+    CtxHook, MemacHook, NgramHook, PathHook, CMP_MAP, CTX_MAP, DDG_MAP, MEM_MAP, NGRAM_MAP,
+    PATH_VEC,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
@@ -428,9 +429,9 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        // dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            // dup2(null_fd, io::stderr().as_raw_fd())?;
+            dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end
