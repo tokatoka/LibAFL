@@ -68,50 +68,6 @@ pub static SHR_8: Ngram8 = Ngram8::from_array([1, 1, 1, 1, 1, 1, 1, 1]);
 ))]
 use core::marker::PhantomData;
 
-/// The hook for path observer
-#[cfg(feature = "sancov_path")]
-#[derive(Debug, Clone, Copy)]
-pub struct PathHook<S> {
-    phantom: PhantomData<S>,
-}
-
-#[cfg(feature = "sancov_path")]
-impl<S> PathHook<S>
-where
-    S: libafl::inputs::UsesInput,
-{
-    #[must_use]
-    /// Constructor
-    pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<S> Default for PathHook<S>
-where
-    S: libafl::inputs::UsesInput,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[cfg(feature = "sancov_path")]
-impl<S> ExecutorHook<S> for PathHook<S>
-where
-    S: libafl::inputs::UsesInput,
-{
-    fn init<E: HasObservers>(&mut self, _state: &mut S) {}
-    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) {
-        unsafe {
-            PATH_VEC.resize(1, 0);
-        }
-    }
-    fn post_exec(&mut self, _state: &mut S, _input: &S::Input) {}
-}
-
 /// The hook to initialize ngram everytime we run the harness
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
 #[rustversion::nightly]
