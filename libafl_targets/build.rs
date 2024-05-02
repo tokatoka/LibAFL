@@ -152,16 +152,6 @@ fn main() {
             .compile("coverage");
     }
 
-    #[cfg(feature = "mem")]
-    {
-        println!("cargo:rerun-if-changed=src/mem-ac.c");
-        let mem_map_size: usize = 65536;
-        cc::Build::new()
-            .file(src_dir.join("memac.c"))
-            .define("MEM_MAP_SIZE", Some(&*format!("{mem_map_size}")))
-            .compile("memac");
-    }
-
     #[cfg(feature = "cmplog")]
     {
         println!("cargo:rerun-if-changed=src/cmplog.h");

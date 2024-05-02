@@ -121,10 +121,6 @@ pub use coverage::*;
 pub mod value_profile;
 pub use value_profile::*;
 
-/// used to record memory access patterns
-pub mod memac;
-pub use memac::*;
-
 /// runtime related to comparisons
 pub mod cmps;
 pub use cmps::*;
