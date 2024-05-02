@@ -282,7 +282,6 @@ fn fuzz(
     cmp_feedback.set_never_corpus();
 
     let calibration = CalibrationStage::new(&map_feedback);
-    let memac_hook = MemacHook::new();
     let ngram_hook = NgramHook::new();
     let ctx_hook = CtxHook::new();
     // Feedback to rate the interestingness of an input
@@ -364,7 +363,7 @@ fn fuzz(
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = HookableInProcessExecutor::with_timeout_generic(
-        tuple_list!(memac_hook, ngram_hook, ctx_hook),
+        tuple_list!(ngram_hook, ctx_hook),
         &mut harness,
         tuple_list!(
             edges_observer,
