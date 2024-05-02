@@ -756,14 +756,14 @@ class DDGInstrModulePass : public PassInfoMixin<DDGInstrModulePass> {
         StoreInst *StoreMapPtr = IRB.CreateStore(Incr, MapPtrIdx);
         StoreMapPtr->setMetadata(M.getMDKindID("nosanitize"),
                                  MDNode::get(C, None));
-        errs() << "Instrumenting" << "\t\n";
-        F.dump();
+        // errs() << "Instrumenting" << "\t\n";
+        // F.dump();
         instrumentedLocations++;
       }
     }
 
-    errs() << "DDG - Instrumented " << instrumentedLocations
-           << " locations over a total of " << bb_count << " \t\n";
+    // errs() << "DDG - Instrumented " << instrumentedLocations
+    //       << " locations over a total of " << bb_count << " \t\n";
 
     auto PA = PreservedAnalyses::all();
     return PA;
