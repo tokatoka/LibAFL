@@ -52,8 +52,7 @@ use libafl_bolts::{
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
-    CtxHook, MemacHook, NgramHook, PathHook, CMP_MAP, CTX_MAP, DDG_MAP, MEM_MAP, NGRAM_MAP,
-    PATH_VEC,
+    CtxHook, MemacHook, NgramHook, CMP_MAP, CTX_MAP, DDG_MAP, MEM_MAP, NGRAM_MAP,
 };
 #[cfg(unix)]
 use nix::unistd::dup;
