@@ -615,6 +615,25 @@ impl<I, C, R, SC> HasNestedStageStatus for StdState<I, C, R, SC> {
     }
 }
 
+/// State that can be resetted
+pub trait HasReset {
+    /// reset it
+    fn reset(&mut self);
+}
+
+impl<I, C, R, SC> HasReset for StdState<I, C, R, SC> {
+    /// Reset the state
+    fn reset(&mut self) {
+        self.metadata = SerdeAnyMap::default();
+        self.named_metadata = NamedSerdeAnyMap::default();
+        self.last_report_time = None;
+        self.last_found_time = libafl_bolts::current_time();
+        self.start_time = libafl_bolts::current_time();
+        self.corpus_id = None;
+        self.stage_stack = StageStack::default();
+    }
+}
+
 #[cfg(feature = "std")]
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
@@ -1118,6 +1137,18 @@ where
         Z: Evaluator<E, EM, State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
+    }
+
+    /// Init the state
+    pub fn init_state<F, O>(&mut self, feedback: &mut F, objective: &mut O) -> Result<(), Error>
+    where 
+        F: Feedback<Self>,
+        O: Feedback<Self>,
+    {
+        feedback.init_state(self)?;
+        objective.init_state(self)?;
+
+        Ok(())
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.

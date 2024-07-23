@@ -420,6 +420,9 @@ where
         {
             *testcase.file_path_mut() = Some(self.dir_path.join(&file_name));
         }
+        else{
+            log::info!("Not updating path because path is {:#?} {:#?} {:#?}", testcase.file_path(), self.dir_path, testcase.file_path().as_ref().unwrap().starts_with(&self.dir_path))
+        }
         *testcase.filename_mut() = Some(file_name);
 
         if self.meta_format.is_some() {

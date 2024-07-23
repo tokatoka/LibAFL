@@ -5,15 +5,11 @@ use core::marker::PhantomData;
 
 use libafl_bolts::{rands::Rand, Error};
 
-use crate::{
-    corpus::{Corpus, HasCurrentCorpusId},
-    schedulers::{RemovableScheduler, Scheduler},
-    stages::Stage,
-    state::{HasCorpus, HasRand, UsesState},
-    HasScheduler,
-};
 #[cfg(feature = "std")]
-use crate::{events::EventRestarter, state::Stoppable};
+use crate::events::EventRestarter;
+use crate::{
+    corpus::{Corpus, HasCurrentCorpusId}, feedbacks::Feedback, schedulers::{RemovableScheduler, Scheduler}, stages::Stage, state::{HasCorpus, HasRand, HasReset, UsesState}, Evaluator, HasFeedback, HasObjective, HasScheduler
+};
 
 #[derive(Debug)]
 /// The stage to probablistically disable a corpus entry.
@@ -36,7 +32,7 @@ impl<EM> CorpusPruning<EM> {
 
 impl<EM> Default for CorpusPruning<EM> {
     fn default() -> Self {
-        Self::new(0.05)
+        Self::new(0.1)
     }
 }
 
@@ -51,7 +47,7 @@ impl<E, EM, Z> Stage<E, EM, Z> for CorpusPruning<EM>
 where
     EM: UsesState,
     E: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State> + HasScheduler,
+    Z: UsesState<State = Self::State> + HasScheduler + Evaluator<E, EM>,
     <Z as HasScheduler>::Scheduler: RemovableScheduler,
     Self::State: HasCorpus + HasRand,
 {
@@ -59,9 +55,9 @@ where
     fn perform(
         &mut self,
         fuzzer: &mut Z,
-        _executor: &mut E,
+        executor: &mut E,
         state: &mut Self::State,
-        _manager: &mut EM,
+        manager: &mut EM,
     ) -> Result<(), Error> {
         // Iterate over every corpus entr
         let n_all = state.corpus().count_all();
@@ -96,31 +92,30 @@ where
                 // and [0, n_enabled) is enabled testcases
                 if i >= n_enabled {
                     // we are moving disabled to enabled now
-                    disabled_to_enabled.push((idx, removed));
+                    disabled_to_enabled.push(removed);
                 } else {
                     // we are moving enabled to disabled now
-                    enabled_to_disabled.push((idx, removed));
+                    enabled_to_disabled.push(removed);
                 }
             }
         }
 
         // Actually move them
-        for (idx, testcase) in disabled_to_enabled {
-            state.corpus_mut().add(testcase)?;
-            fuzzer.scheduler_mut().on_add(state, idx)?;
+        for mut testcase in disabled_to_enabled {
+            let input = testcase.load_input(state.corpus())?;
+            fuzzer.add_input(state, executor, manager, input.clone())?;
         }
 
-        for (idx, testcase) in enabled_to_disabled {
-            state.corpus_mut().add_disabled(testcase)?;
-            fuzzer.scheduler_mut().on_add(state, idx)?;
+        for mut testcase in enabled_to_disabled {
+            let input = testcase.load_input(state.corpus())?;
+            fuzzer.add_disabled_input(state, input.clone())?;
+            // fuzzer.scheduler_mut().on_add(state, new_idx)?;
         }
-        /*
-        eprintln!(
+        log::info!(
             "There was {}, and we retained {} corpura",
             n_all,
             state.corpus().count()
         );
-        */
         Ok(())
     }
 
@@ -152,20 +147,27 @@ where
 #[cfg(feature = "std")]
 impl<E, EM, Z> Stage<E, EM, Z> for RestartStage<E, EM, Z>
 where
+    Self::State: HasReset,
     E: UsesState,
     EM: UsesState<State = Self::State> + EventRestarter,
-    Z: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State> + HasFeedback + HasObjective,
 {
     #[allow(unreachable_code)]
     fn perform(
         &mut self,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         _executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<(), Error> {
+        log::info!("Restarting!");
+        state.reset();
+        fuzzer.feedback_mut().init_state(state)?;
+        fuzzer.objective_mut().init_state(state)?;
+
         manager.on_restart(state).unwrap();
-        state.request_stop();
+
+        std::process::exit(0);
         Ok(())
     }
 

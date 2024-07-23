@@ -354,9 +354,9 @@ fn fuzz(
               state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
               _event_manager: &mut _|
      -> Result<bool, Error> {
-        let last = state.last_found_time();
+        let last = state.start_time();
         let now = libafl_bolts::current_time();
-        let do_restart = now - *last > Duration::from_secs(3);
+        let do_restart = now - *last > Duration::from_secs(30 * 60);
         if do_restart {
             Ok(true)
         } else {
