@@ -39,7 +39,7 @@ use libafl::{
         pruning::{CorpusPruning, RestartStage},
         StdMutationalStage, TracingStage,
     },
-    state::{HasCorpus, HasLastFoundTime, StdState},
+    state::{HasCorpus, HasLastFoundTime, StdState, HasStartTime},
     Error, HasFeedback, HasMetadata, HasObjective,
 };
 use libafl_bolts::{
@@ -354,9 +354,9 @@ fn fuzz(
               state: &mut StdState<_, InMemoryOnDiskCorpus<_>, _, _>,
               _event_manager: &mut _|
      -> Result<bool, Error> {
-        let last = state.last_found_time();
+        let last = state.start_time();
         let now = libafl_bolts::current_time();
-        let do_restart = now - *last > Duration::from_secs(3);
+        let do_restart = now - *last > Duration::from_secs(120 * 60);
         if do_restart {
             Ok(true)
         } else {
@@ -365,7 +365,7 @@ fn fuzz(
     };
 
     let restart = RestartStage::new();
-    let pruning = CorpusPruning::default();
+    let pruning = CorpusPruning::new(0.5);
     let logics = IfStage::new(cb, tuple_list!(pruning, restart));
 
     // The order of the stages matter!
@@ -402,7 +402,10 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {}
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
+            dup2(null_fd, io::stderr().as_raw_fd())?;
+        }
     }
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);

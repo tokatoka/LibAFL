@@ -22,7 +22,7 @@ pub struct CorpusPruning<EM> {
 }
 
 impl<EM> CorpusPruning<EM> {
-    fn new(prob: f64) -> Self {
+    pub fn new(prob: f64) -> Self {
         Self {
             prob,
             phantom: PhantomData,

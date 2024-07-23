@@ -39,7 +39,7 @@ use libafl::{
         pruning::{CorpusPruning, RestartStage},
         StdMutationalStage, TracingStage,
     },
-    state::{HasCorpus, HasLastFoundTime, StdState},
+    state::{HasCorpus, HasLastFoundTime, StdState, HasStartTime},
     Error, HasFeedback, HasMetadata, HasObjective,
 };
 use libafl_bolts::{
@@ -402,8 +402,12 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {}
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
+            dup2(null_fd, io::stderr().as_raw_fd())?;
+        }
     }
+    
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
