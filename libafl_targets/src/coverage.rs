@@ -15,11 +15,11 @@ pub use __afl_area_ptr_local as EDGES_MAP;
 /// The size for memory access map
 pub const MEM_MAP_SIZE: usize = 65536;
 /// The size for ngram coverage map
-pub const NGRAM_MAP_SIZE: usize = 65536;
+pub const NGRAM_MAP_SIZE: usize = 65536 * 4;
 /// The size for ctx coverage map
-pub const CTX_MAP_SIZE: usize = 65536;
+pub const CTX_MAP_SIZE: usize = 65536 * 4;
 /// The size for ddg coverage map
-pub const DDG_MAP_SIZE: usize = 65536;
+pub const DDG_MAP_SIZE: usize = 65536 * 4;
 
 /// The map for remembering the memory access pattern
 #[cfg(feature = "mem")]

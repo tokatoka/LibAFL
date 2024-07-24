@@ -4,7 +4,7 @@
 #include "common.h"
 
 #ifndef CMP_MAP_SIZE
-  #define CMP_MAP_SIZE 65536
+  #define CMP_MAP_SIZE 262144
 #endif
 
 extern uint8_t libafl_cmp_map[CMP_MAP_SIZE];
