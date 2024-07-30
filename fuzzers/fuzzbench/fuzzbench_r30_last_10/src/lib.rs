@@ -207,7 +207,7 @@ fn fuzz(
     timeout: Duration,
 ) -> Result<(), Error> {
     let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
-
+	env_logger::init();
     #[cfg(unix)]
     let mut stdout_cpy = unsafe {
         let new_fd = dup(io::stdout().as_raw_fd())?;
@@ -402,9 +402,9 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
+        // dup2(null_fd, io::stdout().as_raw_fd())?;
         if std::env::var("LIBAFL_FUZZBENCH_DEBUG").is_err() {
-            dup2(null_fd, io::stderr().as_raw_fd())?;
+            // dup2(null_fd, io::stderr().as_raw_fd())?;
         }
     }
     // reopen file to make sure we're at the end
